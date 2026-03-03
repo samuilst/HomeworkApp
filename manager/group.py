@@ -2,30 +2,27 @@ from sqlalchemy.exc import IntegrityError
 
 from db import db
 from models.group import Group
-from models.group_user import GroupUser
 
+
+
+from sqlalchemy.exc import IntegrityError
+from db import db
+from models.group import Group
+from models.user import UserModel
 
 class GroupManager:
 
     @staticmethod
     def create_group(data, current_user):
-        # if current_user.role != "teacher":
-        #     raise PermissionError("Only teachers can create groups")
-
         group = Group(
             name=data["name"],
             owner_id=current_user.id,
             is_private=data.get("is_private", False)
         )
-
+        # owner
+        group.members.append(current_user)
         db.session.add(group)
         db.session.commit()
-
-        # owner automatically becomes member
-        member = GroupUser(group_id=group.id, user_id=current_user.id)
-        db.session.add(member)
-        db.session.commit()
-
         return group
 
     @staticmethod
@@ -34,17 +31,18 @@ class GroupManager:
         if not group:
             raise ValueError("Group not found")
 
-        if current_user.role != "admin" and group.owner_id != current_user.id:
+        if current_user.role.value != "ADMIN" and group.owner_id != current_user.id:
             raise PermissionError("Not allowed")
 
-        membership = GroupUser(group_id=group_id, user_id=user_id)
+        user = UserModel.query.get(user_id)
+        if not user:
+            raise ValueError("User not found")
 
-        try:
-            db.session.add(membership)
-            db.session.commit()
-        except IntegrityError:
-            db.session.rollback()
+        if user in group.members:
             raise ValueError("User already in group")
+
+        group.members.append(user)
+        db.session.commit()
 
     @staticmethod
     def remove_user_from_group(group_id, user_id, current_user):
@@ -52,18 +50,14 @@ class GroupManager:
         if not group:
             raise ValueError("Group not found")
 
-        if current_user.role != "admin" and group.owner_id != current_user.id:
+        if current_user.role.value != "ADMIN" and group.owner_id != current_user.id:
             raise PermissionError("Not allowed")
 
-        membership = GroupUser.query.filter_by(
-            group_id=group_id,
-            user_id=user_id
-        ).first()
-
-        if not membership:
+        user = UserModel.query.get(user_id)
+        if not user or user not in group.members:
             raise ValueError("User not in group")
 
-        db.session.delete(membership)
+        group.members.remove(user)
         db.session.commit()
 
     @staticmethod
@@ -73,12 +67,8 @@ class GroupManager:
             raise ValueError("Group not found")
 
         if group.is_private:
-            member = GroupUser.query.filter_by(
-                group_id=group_id,
-                user_id=current_user.id
-            ).first()
-
-            if not member and current_user.role != "admin":
+            is_member = current_user in group.members
+            if not is_member and current_user.role.value != "ADMIN":
                 raise PermissionError("Private group")
 
         return group
@@ -89,7 +79,7 @@ class GroupManager:
         if not group:
             raise ValueError("Group not found")
 
-        if current_user.role != "admin" and group.owner_id != current_user.id:
+        if current_user.role.value != "ADMIN" and group.owner_id != current_user.id:
             raise PermissionError("Not allowed")
 
         db.session.delete(group)
