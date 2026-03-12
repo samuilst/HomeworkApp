@@ -42,7 +42,7 @@ class GroupManager:
             raise ValueError("User already in group")
 
         group.members.append(user)
-        db.session.commit()
+        db.session.commit() 
 
     @staticmethod
     def remove_user_from_group(group_id, user_id, current_user):

@@ -5,10 +5,7 @@ from decouple import config
 
 from db import db
 
-from models.user import UserModel
-from models.assignment import Assignment
-from models.group import Group
-from models.submission import Submission
+
 from resources.routes import routes
 
 app = Flask(__name__)
@@ -18,7 +15,8 @@ db.init_app(app)
 api = Api(app)
 migrate = Migrate(app, db)
 
-[api.add_resource(*route) for route in routes]
+for route in routes:
+    api.add_resource(*route)
 
 if __name__ == '__main__':
     app.run(debug=True)

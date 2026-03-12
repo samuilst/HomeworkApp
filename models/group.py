@@ -11,4 +11,4 @@ class Group(db.Model):
 
     owner_id = db.Column(db.String, db.ForeignKey("users.id"), nullable=False)
     owner = db.relationship("UserModel")
-    members = db.relationship("UserModel", secondary=group_user, backreef="groups")
+    members = db.relationship("UserModel", secondary=group_user, backref="groups")

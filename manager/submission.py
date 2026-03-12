@@ -4,7 +4,6 @@ from sqlalchemy.exc import IntegrityError
 
 from db import db
 from models.assignment import Assignment
-from models.group_user import GroupUser
 from models.submission import Submission
 
 
@@ -19,10 +18,9 @@ class SubmissionManager:
         if not assignment:
             raise ValueError("Assignment not found")
 
-        membership = GroupUser.query.filter_by(
-            group_id=assignment.group_id,
-            user_id=current_user.id
-        ).first()
+        group = assignment.group
+
+        membership = any(user.id == current_user.id for user in group.users)
 
         if not membership:
             raise PermissionError("Student not in group")
@@ -31,7 +29,7 @@ class SubmissionManager:
             assignment_id=assignment_id,
             student_id=current_user.id,
             file_path=file_path,
-            submitted_at=datetime.utcnow()
+            submitted_at=datetime.datetime.utcnow()
         )
 
         try:
