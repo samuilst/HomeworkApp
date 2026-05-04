@@ -64,7 +64,7 @@ def validate_schema(schema):
         @wraps(function)
         def decorator_function(*args, **kwargs):
             schema_obj = schema
-            data = request.get_json()
+            data = request.get_json(silent=True) or {}
             error = schema_obj.validate(data)
             if error:
                 abort(400, message="Validation error", errors=error)
