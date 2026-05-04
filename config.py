@@ -12,6 +12,7 @@ from resources.routes import routes
 db_user = config('DB_USER')
 db_password = config('DB_PASSWORD')
 db_host = config('DB_HOST')
+db_port = config('DB_PORT', default='5432')
 db_name = config('DB_NAME')
 
 class Config:
@@ -21,7 +22,7 @@ class Config:
 class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = (
-        f'postgresql://{db_user}:{db_password}@{db_host}:5432/{db_name}')
+        f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
 
 def create_app(config = 'config.DevelopmentConfig'):
     app = Flask(__name__, static_folder=None)
