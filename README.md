@@ -247,6 +247,68 @@ PUT    /submissions/<assignment_id>/<student_id>
 GET    /students/<student_id>/submission-count
 ```
 
+### Admin
+
+Only users with role `ADMIN` can access these endpoints.
+
+```text
+GET    /admin/stats
+GET    /admin/users
+POST   /admin/users
+GET    /admin/users/<user_id>
+PUT    /admin/users/<user_id>
+DELETE /admin/users/<user_id>
+GET    /admin/groups
+GET    /admin/assignments
+GET    /admin/submissions
+```
+
+Admin users can:
+
+- View platform statistics
+- List all users
+- Create users with `STUDENT`, `TEACHER`, or `ADMIN` role
+- Update user profile data and role
+- Delete users
+- View all groups, assignments, and submissions
+
+Example create teacher:
+
+```powershell
+curl -X POST http://localhost:5000/admin/users `
+  -H "Authorization: Bearer ADMIN_TOKEN" `
+  -H "Content-Type: application/json" `
+  -d "{\"user_name\":\"teacher1\",\"email\":\"teacher1@test.com\",\"password\":\"Mypass123!\",\"role\":\"TEACHER\"}"
+```
+
+### Teacher
+
+Users with role `TEACHER` or `ADMIN` can access these endpoints.
+
+```text
+GET  /teacher/dashboard
+GET  /teacher/groups
+GET  /teacher/students
+POST /teacher/students
+```
+
+Teachers can:
+
+- View a dashboard for their own groups
+- List groups they own
+- List students from their groups
+- Create student accounts
+- Optionally add a newly created student to one of their groups
+
+Example create student and add to group:
+
+```powershell
+curl -X POST http://localhost:5000/teacher/students `
+  -H "Authorization: Bearer TEACHER_TOKEN" `
+  -H "Content-Type: application/json" `
+  -d "{\"user_name\":\"student1\",\"email\":\"student1@test.com\",\"password\":\"Mypass123!\",\"group_id\":1}"
+```
+
 ## Upload Homework
 
 Homework upload uses `multipart/form-data`.
@@ -274,6 +336,7 @@ curl -X POST http://localhost:5000/submissions `
 - Full access to users, groups, assignments, and submissions
 - Can delete groups, assignments, and submissions
 - Can view reports
+- Can create and manage teacher/admin/student users through `/admin/users`
 - Must be created or promoted directly in the database
 
 ### Teacher
@@ -283,6 +346,7 @@ curl -X POST http://localhost:5000/submissions `
 - Can grade submissions
 - Can add comments
 - Can view public group submissions
+- Can create student accounts through `/teacher/students`
 - Must be created or promoted directly in the database
 
 ### Student

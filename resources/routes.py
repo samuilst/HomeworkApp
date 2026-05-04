@@ -15,6 +15,15 @@ from resources.submission import SubmissionDeleteResource
 from resources.submission import SubmissionGradeResource
 from resources.submission import MissingSubmissionsResource
 from resources.submission import StudentSubmissionCountResource
+from resources.admin import AdminAssignmentsResource
+from resources.admin import AdminGroupsResource
+from resources.admin import AdminStatsResource
+from resources.admin import AdminSubmissionsResource
+from resources.admin import AdminUserDetailResource
+from resources.admin import AdminUsersResource
+from resources.teacher import TeacherDashboardResource
+from resources.teacher import TeacherGroupsResource
+from resources.teacher import TeacherStudentsResource
 
 routes = (
     (UserRegistryResource, "/registry"),
@@ -36,4 +45,15 @@ routes = (
     (SubmissionGradeResource, "/submissions/<int:assignment_id>/<string:student_id>"),
     (MissingSubmissionsResource, "/assignments/<int:assignment_id>/missing-submissions"),
     (StudentSubmissionCountResource, "/students/<string:student_id>/submission-count"),
+
+    (AdminStatsResource, "/admin/stats"),
+    (AdminUsersResource, "/admin/users"),
+    (AdminUserDetailResource, "/admin/users/<string:user_id>"),
+    (AdminGroupsResource, "/admin/groups"),
+    (AdminAssignmentsResource, "/admin/assignments"),
+    (AdminSubmissionsResource, "/admin/submissions"),
+
+    (TeacherDashboardResource, "/teacher/dashboard"),
+    (TeacherGroupsResource, "/teacher/groups"),
+    (TeacherStudentsResource, "/teacher/students"),
 )
