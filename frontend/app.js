@@ -4,6 +4,10 @@ const state = {
   groups: [],
   assignments: [],
   submissions: [],
+  adminStats: null,
+  adminUsers: [],
+  teacherStats: null,
+  teacherStudents: [],
   loading: false,
 };
 
@@ -14,6 +18,8 @@ const routes = {
   "/dashboard": { view: "dashboardView", title: "Dashboard" },
   "/files": { view: "filesView", title: "Files" },
   "/homework": { view: "homeworkView", title: "Homework" },
+  "/teacher": { view: "teacherView", title: "Teacher" },
+  "/admin": { view: "adminView", title: "Admin" },
   "/settings": { view: "settingsView", title: "Settings" },
 };
 
@@ -58,6 +64,10 @@ function clearSession() {
   state.groups = [];
   state.assignments = [];
   state.submissions = [];
+  state.adminStats = null;
+  state.adminUsers = [];
+  state.teacherStats = null;
+  state.teacherStudents = [];
   localStorage.removeItem("classhub_token");
   localStorage.removeItem("classhub_user");
   updateShell();
@@ -72,8 +82,15 @@ function updateShell() {
   $("#sessionRole").textContent = state.user?.role || "Not signed in";
   $("#avatar").textContent = (state.user?.email || state.user?.user_name || "?").slice(0, 1).toUpperCase();
   $("#logoutButton").style.visibility = isLogged ? "visible" : "hidden";
+  updateRoleNavigation();
   if (isLogged) refreshData();
   if (window.lucide) window.lucide.createIcons();
+}
+
+function updateRoleNavigation() {
+  const role = state.user?.role;
+  $$(".teacher-nav").forEach((item) => item.classList.toggle("hidden", !["TEACHER", "ADMIN"].includes(role)));
+  $$(".admin-nav").forEach((item) => item.classList.toggle("hidden", role !== "ADMIN"));
 }
 
 async function api(path, options = {}) {
@@ -119,12 +136,33 @@ async function refreshData() {
     state.groups = groupsData.groups || [];
     state.assignments = assignmentsData.assignments || [];
     state.submissions = submissionsData.submissions || [];
+    await refreshRoleData();
     renderAll();
   } catch (error) {
     $("#lastStatus").textContent = "Error";
     showToast(error.message, "error");
   } finally {
     setLoading(false);
+  }
+}
+
+async function refreshRoleData() {
+  if (["TEACHER", "ADMIN"].includes(state.user?.role)) {
+    const [teacherStats, teacherStudents] = await Promise.all([
+      api("/teacher/dashboard"),
+      api("/teacher/students"),
+    ]);
+    state.teacherStats = teacherStats;
+    state.teacherStudents = teacherStudents.students || [];
+  }
+
+  if (state.user?.role === "ADMIN") {
+    const [adminStats, adminUsers] = await Promise.all([
+      api("/admin/stats"),
+      api("/admin/users"),
+    ]);
+    state.adminStats = adminStats;
+    state.adminUsers = adminUsers.users || [];
   }
 }
 
@@ -138,6 +176,8 @@ function showLoadingStates() {
 }
 
 function normalizePath(pathname) {
+  if (pathname === "/admin" && state.user?.role !== "ADMIN") return "/dashboard";
+  if (pathname === "/teacher" && !["TEACHER", "ADMIN"].includes(state.user?.role)) return "/dashboard";
   return routes[pathname] ? pathname : "/dashboard";
 }
 
@@ -167,8 +207,61 @@ function renderAll() {
   renderGroups();
   renderAssignments();
   renderSubmissions();
+  renderTeacher();
+  renderAdmin();
   fillSelects();
   if (window.lucide) window.lucide.createIcons();
+}
+
+function renderTeacher() {
+  const stats = state.teacherStats || {};
+  $("#teacherGroupCount").textContent = stats.groups ?? 0;
+  $("#teacherStudentCount").textContent = stats.students ?? 0;
+  $("#teacherAssignmentCount").textContent = stats.assignments ?? 0;
+  $("#teacherUngradedCount").textContent = stats.ungraded_submissions ?? 0;
+
+  $("#teacherStudentsList").innerHTML = state.teacherStudents.length
+    ? state.teacherStudents.map((student) => `
+      <article class="item-card">
+        <strong>${escapeHtml(student.user_name)}</strong>
+        <small>${escapeHtml(student.email)}</small>
+        <div class="pill-row">
+          <span class="pill blue">ID ${escapeHtml(student.id)}</span>
+          <span class="pill green">${escapeHtml(student.role)}</span>
+        </div>
+      </article>
+    `).join("")
+    : emptyState("No students in your groups yet.");
+}
+
+function renderAdmin() {
+  const stats = state.adminStats || {};
+  $("#adminUserCount").textContent = stats.users ?? 0;
+  $("#adminTeacherCount").textContent = stats.teachers ?? 0;
+  $("#adminStudentCount").textContent = stats.students ?? 0;
+  $("#adminSubmissionCount").textContent = stats.submissions ?? 0;
+
+  $("#adminUsersList").innerHTML = state.adminUsers.length
+    ? state.adminUsers.map((user) => `
+      <article class="admin-row">
+        <div>
+          <strong>${escapeHtml(user.user_name)}</strong>
+          <small>${escapeHtml(user.email)}</small>
+          <small>ID ${escapeHtml(user.id)}</small>
+        </div>
+        <form class="role-form" data-user-id="${escapeHtml(user.id)}">
+          <select name="role" aria-label="Role for ${escapeHtml(user.user_name)}">
+            <option value="STUDENT" ${user.role === "STUDENT" ? "selected" : ""}>STUDENT</option>
+            <option value="TEACHER" ${user.role === "TEACHER" ? "selected" : ""}>TEACHER</option>
+            <option value="ADMIN" ${user.role === "ADMIN" ? "selected" : ""}>ADMIN</option>
+          </select>
+          <button class="secondary-button" type="submit"><i data-lucide="save"></i><span>Save role</span></button>
+        </form>
+      </article>
+    `).join("")
+    : emptyState("No users found.");
+
+  bindRoleForms();
 }
 
 function renderMetrics() {
@@ -255,6 +348,33 @@ function fillSelects() {
 
   $$('select[name="assignment_id"]').forEach((select) => {
     select.innerHTML = assignmentOptions || `<option value="">No homework available</option>`;
+  });
+
+  const optionalGroupOptions = `<option value="">Do not add to group</option>${groupOptions}`;
+  $$('#teacherCreateStudentForm select[name="group_id"]').forEach((select) => {
+    select.innerHTML = optionalGroupOptions;
+  });
+}
+
+function bindRoleForms() {
+  $$(".role-form").forEach((form) => {
+    if (form.dataset.bound === "true") return;
+    form.dataset.bound = "true";
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const userId = event.currentTarget.dataset.userId;
+        const role = event.currentTarget.elements.role.value;
+        await api(`/admin/users/${encodeURIComponent(userId)}`, {
+          method: "PUT",
+          body: JSON.stringify({ role }),
+        });
+        await refreshData();
+        showToast("User role updated");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
   });
 }
 
@@ -399,6 +519,33 @@ function bindForms() {
       const data = readForm(event.currentTarget);
       const payload = await api(`/students/${encodeURIComponent(data.student_id)}/submission-count`);
       $("#countResult").textContent = `${payload.user_name}: ${payload.submission_count} uploaded file(s)`;
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+
+  $("#teacherCreateStudentForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const data = readForm(event.currentTarget);
+      if (!data.group_id) delete data.group_id;
+      await api("/teacher/students", { method: "POST", body: JSON.stringify(data) });
+      event.currentTarget.reset();
+      await refreshData();
+      showToast("Student created");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+
+  $("#adminCreateUserForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const data = readForm(event.currentTarget);
+      await api("/admin/users", { method: "POST", body: JSON.stringify(data) });
+      event.currentTarget.reset();
+      await refreshData();
+      showToast("User created");
     } catch (error) {
       showToast(error.message, "error");
     }

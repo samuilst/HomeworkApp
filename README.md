@@ -193,6 +193,8 @@ Frontend routes:
 /dashboard
 /files
 /homework
+/teacher
+/admin
 /settings
 ```
 
@@ -202,7 +204,12 @@ Main pages in the dashboard:
 - Dashboard overview
 - Files grid and S3 upload
 - Homework, groups, grading, and missing submission reports
+- Teacher tools for users with `TEACHER` or `ADMIN` role
+- Admin tools for users with `ADMIN` role
 - Settings and S3 configuration helper
+
+The `/teacher` tab is visible only after logging in as `TEACHER` or `ADMIN`.
+The `/admin` tab is visible only after logging in as `ADMIN`.
 
 ## Main API Endpoints
 

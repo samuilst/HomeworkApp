@@ -33,6 +33,8 @@
           <button class="nav-button active" data-route="/dashboard"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></button>
           <button class="nav-button" data-route="/files"><i data-lucide="folder-open"></i><span>Files</span></button>
           <button class="nav-button" data-route="/homework"><i data-lucide="clipboard-list"></i><span>Homework</span></button>
+          <button class="nav-button role-nav teacher-nav hidden" data-route="/teacher"><i data-lucide="school"></i><span>Teacher</span></button>
+          <button class="nav-button role-nav admin-nav hidden" data-route="/admin"><i data-lucide="shield"></i><span>Admin</span></button>
           <button class="nav-button" data-route="/settings"><i data-lucide="settings"></i><span>Settings</span></button>
         </nav>
 
@@ -202,6 +204,62 @@ AWS_S3_BUCKET_NAME=your-bucket-name</pre>
                   <button class="secondary-button" type="submit"><i data-lucide="calculator"></i><span>Count uploads</span></button>
                 </form>
                 <div class="result-box" id="countResult">No student selected.</div>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="teacherView">
+            <div class="metric-grid">
+              <div class="metric glass"><span>My groups</span><strong id="teacherGroupCount">0</strong><i data-lucide="users"></i></div>
+              <div class="metric glass"><span>Students</span><strong id="teacherStudentCount">0</strong><i data-lucide="graduation-cap"></i></div>
+              <div class="metric glass"><span>Assignments</span><strong id="teacherAssignmentCount">0</strong><i data-lucide="clipboard-list"></i></div>
+              <div class="metric glass"><span>Ungraded</span><strong id="teacherUngradedCount">0</strong><i data-lucide="badge-alert"></i></div>
+            </div>
+            <div class="split-layout">
+              <section class="panel glass">
+                <div class="panel-head"><h2>Teacher students</h2><i data-lucide="graduation-cap"></i></div>
+                <div class="item-list" id="teacherStudentsList"></div>
+              </section>
+              <section class="panel glass">
+                <div class="panel-head"><h2>Create student</h2><i data-lucide="user-plus"></i></div>
+                <form id="teacherCreateStudentForm" class="form-grid">
+                  <label>Username<input name="user_name" maxlength="10" required /></label>
+                  <label>Email<input name="email" type="email" required /></label>
+                  <label>Password<input name="password" type="password" required /></label>
+                  <label>Optional group<select name="group_id"></select></label>
+                  <button class="primary-button" type="submit"><i data-lucide="plus"></i><span>Create student</span></button>
+                </form>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="adminView">
+            <div class="metric-grid">
+              <div class="metric glass"><span>Users</span><strong id="adminUserCount">0</strong><i data-lucide="users"></i></div>
+              <div class="metric glass"><span>Teachers</span><strong id="adminTeacherCount">0</strong><i data-lucide="school"></i></div>
+              <div class="metric glass"><span>Students</span><strong id="adminStudentCount">0</strong><i data-lucide="graduation-cap"></i></div>
+              <div class="metric glass"><span>Submissions</span><strong id="adminSubmissionCount">0</strong><i data-lucide="files"></i></div>
+            </div>
+            <div class="split-layout wide-left">
+              <section class="panel glass">
+                <div class="panel-head"><h2>User administration</h2><i data-lucide="shield"></i></div>
+                <div class="admin-table" id="adminUsersList"></div>
+              </section>
+              <section class="panel glass">
+                <div class="panel-head"><h2>Create privileged user</h2><i data-lucide="user-cog"></i></div>
+                <form id="adminCreateUserForm" class="form-grid">
+                  <label>Username<input name="user_name" maxlength="50" required /></label>
+                  <label>Email<input name="email" type="email" required /></label>
+                  <label>Password<input name="password" type="password" required /></label>
+                  <label>Role
+                    <select name="role" required>
+                      <option value="STUDENT">STUDENT</option>
+                      <option value="TEACHER">TEACHER</option>
+                      <option value="ADMIN">ADMIN</option>
+                    </select>
+                  </label>
+                  <button class="primary-button" type="submit"><i data-lucide="user-plus"></i><span>Create user</span></button>
+                </form>
               </section>
             </div>
           </section>

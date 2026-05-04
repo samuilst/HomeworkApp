@@ -56,7 +56,7 @@ def create_app(config = 'config.DevelopmentConfig'):
 
     @app.route("/<path:path>")
     def frontend_assets(path):
-        if path in {"dashboard", "files", "homework", "settings"}:
+        if path in {"dashboard", "files", "homework", "settings", "admin", "teacher"}:
             return send_from_directory(frontend_folder, "index.html")
         return send_from_directory(frontend_folder, path)
 
