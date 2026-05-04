@@ -29,8 +29,7 @@ class UserRegistryResource(Resource):
             data['password'],
             method='pbkdf2:sha256'
         )
-        if data.get("role"):
-            data["role"] = UserRoleEnum(data["role"])
+        data["role"] = UserRoleEnum.STUDENT
 
         user = UserModel(**data)
         db.session.add(user)

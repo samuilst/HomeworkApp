@@ -1,3 +1,5 @@
+import os
+
 from decouple import config
 from flask import Flask, send_from_directory
 from flask_migrate import Migrate
@@ -22,8 +24,9 @@ class DevelopmentConfig(Config):
         f'postgresql://{db_user}:{db_password}@{db_host}:5432/{db_name}')
 
 def create_app(config = 'config.DevelopmentConfig'):
-    app = Flask(__name__, static_folder="frontend", static_url_path="")
+    app = Flask(__name__, static_folder=None)
     app.config.from_object(config)
+    frontend_folder = os.path.join(app.root_path, "frontend")
 
     api = Api(app)
     migrate = Migrate(app, db)
@@ -48,10 +51,12 @@ def create_app(config = 'config.DevelopmentConfig'):
 
     @app.route("/")
     def frontend_index():
-        return send_from_directory(app.static_folder, "index.html")
+        return send_from_directory(frontend_folder, "index.html")
 
     @app.route("/<path:path>")
     def frontend_assets(path):
-        return send_from_directory(app.static_folder, path)
+        if path in {"dashboard", "files", "homework", "settings"}:
+            return send_from_directory(frontend_folder, "index.html")
+        return send_from_directory(frontend_folder, path)
 
     return app
