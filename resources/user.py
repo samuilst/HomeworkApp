@@ -4,6 +4,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import db
 from manager.auth import auth, validate_schema
+from manager.auth import AuthManager
+from models.enums import UserRoleEnum
 from models.user import UserModel
 
 from schemas.request.auth import UserRegisterSchema, UserSignInSchema
@@ -27,6 +29,8 @@ class UserRegistryResource(Resource):
             data['password'],
             method='pbkdf2:sha256'
         )
+        if data.get("role"):
+            data["role"] = UserRoleEnum(data["role"])
 
         user = UserModel(**data)
         db.session.add(user)
@@ -59,6 +63,7 @@ class UserSignInResource(Resource):
 
         return {
             "message": "User login successfully!",
+            "token": AuthManager.encode_token(user),
             "user_id": user.id,
             'role': user.role.value
         }, 200

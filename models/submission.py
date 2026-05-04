@@ -3,6 +3,9 @@ from datetime import datetime
 
 class Submission(db.Model):
     __tablename__ = "submissions"
+    __table_args__ = (
+        db.UniqueConstraint("assignment_id", "student_id", name="uq_submission_assignment_student"),
+    )
 
     submission_id = db.Column(db.Integer, primary_key=True)
     file_path = db.Column(db.String(500), nullable=False)

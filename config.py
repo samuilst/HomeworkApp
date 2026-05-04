@@ -1,7 +1,8 @@
 from decouple import config
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_migrate import Migrate
 from flask_restful import Api
+from marshmallow import ValidationError
 
 from db import db
 from resources.routes import routes
@@ -21,12 +22,36 @@ class DevelopmentConfig(Config):
         f'postgresql://{db_user}:{db_password}@{db_host}:5432/{db_name}')
 
 def create_app(config = 'config.DevelopmentConfig'):
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder="frontend", static_url_path="")
     app.config.from_object(config)
 
     api = Api(app)
     migrate = Migrate(app, db)
 
+    @app.errorhandler(ValidationError)
+    def handle_validation_error(error):
+        return {"message": "Validation error", "errors": error.messages}, 400
+
+    @app.errorhandler(ValueError)
+    def handle_value_error(error):
+        return {"message": str(error)}, 400
+
+    @app.errorhandler(PermissionError)
+    def handle_permission_error(error):
+        return {"message": str(error)}, 403
+
+    @app.errorhandler(RuntimeError)
+    def handle_runtime_error(error):
+        return {"message": str(error)}, 500
 
     [api.add_resource(*route) for route in routes]
+
+    @app.route("/")
+    def frontend_index():
+        return send_from_directory(app.static_folder, "index.html")
+
+    @app.route("/<path:path>")
+    def frontend_assets(path):
+        return send_from_directory(app.static_folder, path)
+
     return app

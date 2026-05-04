@@ -17,5 +17,9 @@ class UserModel(db.Model):
     created_on = db.Column(db.DateTime, nullable=False, default=datetime.datetime.now(datetime.timezone.utc))
     updated_on = db.Column(db.DateTime, server_default=func.now(),nullable=False, onupdate=func.now())
 
+    def encode_token(self):
+        from manager.auth import AuthManager
+
+        return AuthManager.encode_token(self)
 
 

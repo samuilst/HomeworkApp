@@ -1,0 +1,11 @@
+Flask
+Flask-HTTPAuth
+Flask-Migrate
+Flask-RESTful
+Flask-SQLAlchemy
+PyJWT
+boto3
+marshmallow
+password-strength
+psycopg2-binary
+python-decouple

@@ -1,4 +1,5 @@
 import datetime
+from functools import wraps
 
 from decouple import config
 from flask import request
@@ -30,7 +31,7 @@ class AuthManager:
     def decode_token(token):
         try:
             result = jwt.decode(jwt=token, key=config('SECRET_KEY'), algorithms=['HS256'])
-            user = db.session.execute(db.selector(UserModel).filter_by(id=result['sub'])).scalar()
+            user = UserModel.query.get(result['sub'])
             if not user:
                 raise jwt.exceptions.InvalidTokenError()
             return user
@@ -60,12 +61,13 @@ class AuthManager:
 
 def validate_schema(schema):
     def decorator(function):
+        @wraps(function)
         def decorator_function(*args, **kwargs):
             schema_obj = schema
             data = request.get_json()
             error = schema_obj.validate(data)
             if error:
-                abort(400)
+                abort(400, message="Validation error", errors=error)
             return function(*args, **kwargs)
 
         return decorator_function

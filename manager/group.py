@@ -1,12 +1,5 @@
-from sqlalchemy.exc import IntegrityError
-
 from db import db
-from models.group import Group
-
-
-
-from sqlalchemy.exc import IntegrityError
-from db import db
+from models.enums import UserRoleEnum
 from models.group import Group
 from models.user import UserModel
 
@@ -14,6 +7,9 @@ class GroupManager:
 
     @staticmethod
     def create_group(data, current_user):
+        if not data.get("name"):
+            raise ValueError("Group name is required")
+
         group = Group(
             name=data["name"],
             owner_id=current_user.id,
@@ -31,7 +27,7 @@ class GroupManager:
         if not group:
             raise ValueError("Group not found")
 
-        if current_user.role.value != "ADMIN" and group.owner_id != current_user.id:
+        if current_user.role != UserRoleEnum.ADMIN and group.owner_id != current_user.id:
             raise PermissionError("Not allowed")
 
         user = UserModel.query.get(user_id)
@@ -50,7 +46,7 @@ class GroupManager:
         if not group:
             raise ValueError("Group not found")
 
-        if current_user.role.value != "ADMIN" and group.owner_id != current_user.id:
+        if current_user.role != UserRoleEnum.ADMIN and group.owner_id != current_user.id:
             raise PermissionError("Not allowed")
 
         user = UserModel.query.get(user_id)
@@ -68,7 +64,7 @@ class GroupManager:
 
         if group.is_private:
             is_member = current_user in group.members
-            if not is_member and current_user.role.value != "ADMIN":
+            if not is_member and current_user.role != UserRoleEnum.ADMIN:
                 raise PermissionError("Private group")
 
         return group
@@ -79,7 +75,7 @@ class GroupManager:
         if not group:
             raise ValueError("Group not found")
 
-        if current_user.role.value != "ADMIN" and group.owner_id != current_user.id:
+        if current_user.role != UserRoleEnum.ADMIN and group.owner_id != current_user.id:
             raise PermissionError("Not allowed")
 
         db.session.delete(group)

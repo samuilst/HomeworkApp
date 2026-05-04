@@ -1,5 +1,5 @@
 from db import db
-from models import group_user
+from models.group_user import group_users
 
 
 class Group(db.Model):
@@ -11,4 +11,5 @@ class Group(db.Model):
 
     owner_id = db.Column(db.String, db.ForeignKey("users.id"), nullable=False)
     owner = db.relationship("UserModel")
-    members = db.relationship("UserModel", secondary=group_user, backref="groups")
+    members = db.relationship("UserModel", secondary=group_users, backref="groups")
+    assignments = db.relationship("Assignment", back_populates="group", cascade="all, delete-orphan")

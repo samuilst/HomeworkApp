@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ClassHub | Домашни и оценки</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://unpkg.com/lucide@latest" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CH</div>
+          <div>
+            <strong>ClassHub</strong>
+            <span>Домашни и оценки</span>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Основна навигация">
+          <button class="nav-button active" data-view="overview"><i data-lucide="layout-dashboard"></i><span>Начало</span></button>
+          <button class="nav-button" data-view="groups"><i data-lucide="users"></i><span>Групи</span></button>
+          <button class="nav-button" data-view="assignments"><i data-lucide="clipboard-list"></i><span>Задания</span></button>
+          <button class="nav-button" data-view="submissions"><i data-lucide="upload-cloud"></i><span>Предавания</span></button>
+          <button class="nav-button" data-view="reports"><i data-lucide="bar-chart-3"></i><span>Отчети</span></button>
+          <button class="nav-button" data-view="settings"><i data-lucide="settings"></i><span>S3</span></button>
+        </nav>
+
+        <div class="session-box">
+          <span id="sessionName">Няма вход</span>
+          <small id="sessionRole">Гост</small>
+          <button class="ghost-button" id="logoutButton"><i data-lucide="log-out"></i><span>Изход</span></button>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Платформа за домашни</p>
+            <h1 id="viewTitle">Начало</h1>
+          </div>
+          <button class="primary-button" id="refreshButton"><i data-lucide="refresh-cw"></i><span>Обнови</span></button>
+        </header>
+
+        <section class="auth-panel" id="authPanel">
+          <div class="auth-visual">
+            <div class="orbit orbit-a"></div>
+            <div class="orbit orbit-b"></div>
+            <div class="paper-stack">
+              <div></div>
+              <div></div>
+              <div></div>
+            </div>
+          </div>
+
+          <div class="auth-forms">
+            <div class="tabs">
+              <button class="tab active" data-auth-tab="login">Вход</button>
+              <button class="tab" data-auth-tab="register">Регистрация</button>
+            </div>
+
+            <form id="loginForm" class="form-grid auth-form">
+              <label>Email<input name="email" type="email" required /></label>
+              <label>Парола<input name="password" type="password" required /></label>
+              <button class="primary-button full" type="submit"><i data-lucide="log-in"></i><span>Влез</span></button>
+            </form>
+
+            <form id="registerForm" class="form-grid auth-form hidden">
+              <label>Потребител<input name="user_name" maxlength="10" required /></label>
+              <label>Email<input name="email" type="email" required /></label>
+              <label>Парола<input name="password" type="password" required /></label>
+              <label>Роля
+                <select name="role">
+                  <option value="STUDENT">Ученик</option>
+                  <option value="TEACHER">Учител</option>
+                  <option value="ADMIN">Админ</option>
+                </select>
+              </label>
+              <button class="primary-button full" type="submit"><i data-lucide="user-plus"></i><span>Създай профил</span></button>
+            </form>
+          </div>
+        </section>
+
+        <section class="content hidden" id="appContent">
+          <section class="view active" id="overviewView">
+            <div class="metric-grid">
+              <div class="metric"><span>Групи</span><strong id="groupCount">0</strong></div>
+              <div class="metric"><span>Задания</span><strong id="assignmentCount">0</strong></div>
+              <div class="metric"><span>Предадени</span><strong id="submissionCount">0</strong></div>
+              <div class="metric"><span>Последен статус</span><strong id="lastStatus">OK</strong></div>
+            </div>
+            <div class="split-layout">
+              <section class="panel">
+                <div class="panel-head">
+                  <h2>Последни задания</h2>
+                  <i data-lucide="calendar-clock"></i>
+                </div>
+                <div class="item-list" id="recentAssignments"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <h2>Последни предавания</h2>
+                  <i data-lucide="file-check-2"></i>
+                </div>
+                <div class="item-list" id="recentSubmissions"></div>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="groupsView">
+            <div class="split-layout">
+              <section class="panel">
+                <div class="panel-head"><h2>Моите групи</h2><i data-lucide="users"></i></div>
+                <div class="item-list" id="groupsList"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head"><h2>Нова група</h2><i data-lucide="folder-plus"></i></div>
+                <form id="groupForm" class="form-grid">
+                  <label>Име<input name="name" maxlength="255" required /></label>
+                  <label class="check-row"><input name="is_private" type="checkbox" /> Частна група</label>
+                  <button class="primary-button" type="submit"><i data-lucide="plus"></i><span>Създай</span></button>
+                </form>
+                <form id="addUserForm" class="form-grid compact-form">
+                  <label>Група<select name="group_id" required></select></label>
+                  <label>ID на ученик<input name="user_id" required /></label>
+                  <button class="secondary-button" type="submit"><i data-lucide="user-plus"></i><span>Добави</span></button>
+                </form>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="assignmentsView">
+            <div class="split-layout">
+              <section class="panel">
+                <div class="panel-head"><h2>Задания</h2><i data-lucide="clipboard-list"></i></div>
+                <div class="item-list" id="assignmentsList"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head"><h2>Ново задание</h2><i data-lucide="square-pen"></i></div>
+                <form id="assignmentForm" class="form-grid">
+                  <label>Група<select name="group_id" required></select></label>
+                  <label>Заглавие<input name="title" maxlength="255" required /></label>
+                  <label>Краен срок<input name="due_date" type="date" /></label>
+                  <label>Описание<textarea name="description" rows="5"></textarea></label>
+                  <button class="primary-button" type="submit"><i data-lucide="plus"></i><span>Създай</span></button>
+                </form>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="submissionsView">
+            <div class="split-layout">
+              <section class="panel">
+                <div class="panel-head"><h2>Предадени домашни</h2><i data-lucide="inbox"></i></div>
+                <div class="item-list" id="submissionsList"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head"><h2>Качи домашно</h2><i data-lucide="upload"></i></div>
+                <form id="uploadForm" class="form-grid" enctype="multipart/form-data">
+                  <label>Задание<select name="assignment_id" required></select></label>
+                  <label>Файл<input name="file" type="file" required /></label>
+                  <button class="primary-button" type="submit"><i data-lucide="cloud-upload"></i><span>Качи</span></button>
+                </form>
+                <form id="gradeForm" class="form-grid compact-form">
+                  <label>Задание<select name="assignment_id" required></select></label>
+                  <label>ID на ученик<input name="student_id" required /></label>
+                  <label>Оценка<input name="grade" type="number" min="2" max="6" required /></label>
+                  <label>Коментар<textarea name="comment" rows="3"></textarea></label>
+                  <button class="secondary-button" type="submit"><i data-lucide="badge-check"></i><span>Оцени</span></button>
+                </form>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="reportsView">
+            <div class="split-layout">
+              <section class="panel">
+                <div class="panel-head"><h2>Непредали</h2><i data-lucide="user-x"></i></div>
+                <form id="reportForm" class="form-grid horizontal-form">
+                  <label>Задание<select name="assignment_id" required></select></label>
+                  <button class="primary-button" type="submit"><i data-lucide="search"></i><span>Покажи</span></button>
+                </form>
+                <div class="item-list" id="missingList"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head"><h2>Брой качени</h2><i data-lucide="hash"></i></div>
+                <form id="countForm" class="form-grid horizontal-form">
+                  <label>ID на ученик<input name="student_id" required /></label>
+                  <button class="secondary-button" type="submit"><i data-lucide="calculator"></i><span>Изчисли</span></button>
+                </form>
+                <div class="result-box" id="countResult">-</div>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="settingsView">
+            <section class="panel">
+              <div class="panel-head"><h2>S3 конфигурация</h2><i data-lucide="cloud"></i></div>
+              <div class="config-grid">
+                <code>AWS_ACCESS_KEY_ID</code>
+                <code>AWS_SECRET_ACCESS_KEY</code>
+                <code>AWS_REGION_NAME</code>
+                <code>AWS_S3_BUCKET_NAME</code>
+              </div>
+              <pre class="code-block">AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION_NAME=eu-central-1
+AWS_S3_BUCKET_NAME=your-bucket-name</pre>
+            </section>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

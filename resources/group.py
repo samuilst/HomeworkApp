@@ -3,6 +3,10 @@ from flask_restful import Resource
 
 from manager.auth import auth
 from manager.group import GroupManager
+from schemas.group import GroupCreateSchema, GroupUserSchema
+
+group_schema = GroupCreateSchema()
+group_user_schema = GroupUserSchema()
 
 
 class GroupListResource(Resource):
@@ -27,10 +31,12 @@ class GroupListResource(Resource):
     @auth.login_required
     def post(self):
         current_user = auth.current_user()
-        data = request.get_json()
+        data = group_schema.load(request.get_json() or {})
         group = GroupManager.create_group(data, current_user)
         return {
-            "Group created": group
+            "id": group.id,
+            "name": group.name,
+            "is_private": group.is_private
         }, 201
 
 class GroupDeleteResource(Resource):
@@ -50,7 +56,7 @@ class GroupAddUserResource(Resource):
     @auth.login_required
     def post(self, group_id):
         current_user = auth.current_user()
-        data = request.get_json()
+        data = group_user_schema.load(request.get_json() or {})
 
         GroupManager.add_user_to_group(
             group_id,
@@ -92,5 +98,23 @@ class GroupDetailResource(Resource):
             "id": group.id,
             "name": group.name,
             "owner_id": group.owner_id,
-            "is_private": group.is_private
+            "is_private": group.is_private,
+            "members": [
+                {
+                    "id": member.id,
+                    "user_name": member.user_name,
+                    "email": member.email,
+                    "role": member.role.value,
+                }
+                for member in group.members
+            ],
+            "assignments": [
+                {
+                    "id": assignment.id,
+                    "title": assignment.title,
+                    "description": assignment.description,
+                    "due_date": assignment.due_date.isoformat() if assignment.due_date else None,
+                }
+                for assignment in group.assignments
+            ],
         }

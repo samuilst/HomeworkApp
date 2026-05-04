@@ -2,21 +2,45 @@ from datetime import date
 
 from db import db
 from models.assignment import Assignment
+from models.enums import UserRoleEnum
 from models.group import Group
 
 
 class AssignmentManager:
+    @staticmethod
+    def list_assignments(current_user, group_id=None):
+        query = Assignment.query
+        if group_id:
+            query = query.filter_by(group_id=group_id)
+
+        assignments = query.order_by(Assignment.due_date.asc().nullslast(), Assignment.id.desc()).all()
+
+        visible = []
+        for assignment in assignments:
+            group = assignment.group
+            is_member = current_user in group.members
+            is_owner = assignment.created_by == current_user.id
+            can_see = (
+                current_user.role == UserRoleEnum.ADMIN
+                or is_owner
+                or is_member
+                or (current_user.role == UserRoleEnum.TEACHER and not group.is_private)
+            )
+            if can_see:
+                visible.append(assignment)
+
+        return visible
 
     @staticmethod
     def create_assignment(data, current_user):
-        if current_user.role != "teacher":
+        if current_user.role not in (UserRoleEnum.TEACHER, UserRoleEnum.ADMIN):
             raise PermissionError("Only teachers can create assignments")
 
         group = Group.query.get(data["group_id"])
         if not group:
             raise ValueError("Group not found")
 
-        if group.owner_id != current_user.id:
+        if current_user.role != UserRoleEnum.ADMIN and group.owner_id != current_user.id:
             raise PermissionError("You are not the owner of this group")
 
         if "due_date" in data and data["due_date"] < date.today():
@@ -41,14 +65,15 @@ class AssignmentManager:
         if not assignment:
             raise ValueError("Assignment not found")
 
-        if current_user.role != "teacher":
+        if current_user.role not in (UserRoleEnum.TEACHER, UserRoleEnum.ADMIN):
             raise PermissionError("Only teachers can update")
 
-        if assignment.created_by != current_user.id:
+        if current_user.role != UserRoleEnum.ADMIN and assignment.created_by != current_user.id:
             raise PermissionError("Not your assignment")
 
         assignment.title = data.get("title", assignment.title)
         assignment.description = data.get("description", assignment.description)
+        assignment.due_date = data.get("due_date", assignment.due_date)
 
         db.session.commit()
         return assignment
@@ -59,7 +84,7 @@ class AssignmentManager:
         if not assignment:
             raise ValueError("Assignment not found")
 
-        if current_user.role != "admin" and assignment.created_by != current_user.id:
+        if current_user.role != UserRoleEnum.ADMIN and assignment.created_by != current_user.id:
             raise PermissionError("Not allowed")
 
         db.session.delete(assignment)
