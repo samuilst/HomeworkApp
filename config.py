@@ -24,9 +24,9 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_DATABASE_URI = (
         f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
 
-def create_app(config = 'config.DevelopmentConfig'):
+def create_app(config_class = 'config.DevelopmentConfig'):
     app = Flask(__name__, static_folder=None)
-    app.config.from_object(config)
+    app.config.from_object(config_class)
     frontend_folder = os.path.join(app.root_path, "frontend")
 
     api = Api(app)
