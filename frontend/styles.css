@@ -125,6 +125,10 @@ button {
   box-shadow: 0 16px 34px rgba(56, 189, 248, 0.22);
 }
 
+.brand-icon {
+  object-fit: cover;
+}
+
 .brand strong,
 .brand span,
 .session-card span,
@@ -236,6 +240,13 @@ svg {
   justify-content: space-between;
   gap: 16px;
   margin: 4px 0 20px;
+}
+
+#refreshButton {
+  position: fixed;
+  top: 18px;
+  right: 24px;
+  z-index: 6;
 }
 
 .eyebrow {
@@ -423,6 +434,17 @@ h2 {
   min-height: 138px;
   padding: 20px;
   overflow: hidden;
+}
+
+.compact-metrics {
+  margin-bottom: 0;
+}
+
+.compact-metrics .metric {
+  min-height: 112px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: none;
 }
 
 .metric span {
@@ -660,6 +682,81 @@ option {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.toolbar,
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toolbar {
+  margin-bottom: 14px;
+}
+
+.card-actions {
+  padding-top: 4px;
+}
+
+.action-menu {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.action-menu summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 36px;
+  border-radius: 14px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #dbeafe;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  list-style: none;
+}
+
+.action-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.action-menu[open] summary {
+  background: rgba(56, 189, 248, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.22);
+}
+
+.inline-edit-form {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.54);
+}
+
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 14px;
+  padding: 8px 12px;
+  background: rgba(251, 113, 133, 0.16);
+  color: #fecdd3;
+  box-shadow: inset 0 0 0 1px rgba(251, 113, 133, 0.22);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.danger-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 34px rgba(251, 113, 133, 0.16);
 }
 
 .pill {

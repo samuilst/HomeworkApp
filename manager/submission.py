@@ -12,6 +12,17 @@ from manager.s3_storage import S3Storage
 
 class SubmissionManager:
     @staticmethod
+    def can_view_submission(submission, current_user):
+        assignment = submission.assignment
+        group = assignment.group
+        return (
+            current_user.role == UserRoleEnum.ADMIN
+            or submission.student_id == current_user.id
+            or assignment.created_by == current_user.id
+            or (current_user.role == UserRoleEnum.TEACHER and not group.is_private)
+        )
+
+    @staticmethod
     def list_submissions(current_user, assignment_id=None):
         query = Submission.query
         if assignment_id:
@@ -20,18 +31,21 @@ class SubmissionManager:
         submissions = query.order_by(Submission.submitted_at.desc()).all()
         visible = []
         for submission in submissions:
-            assignment = submission.assignment
-            group = assignment.group
-            can_see = (
-                current_user.role == UserRoleEnum.ADMIN
-                or submission.student_id == current_user.id
-                or assignment.created_by == current_user.id
-                or (current_user.role == UserRoleEnum.TEACHER and not group.is_private)
-            )
-            if can_see:
+            if SubmissionManager.can_view_submission(submission, current_user):
                 visible.append(submission)
 
         return visible
+
+    @staticmethod
+    def get_visible_submission(submission_id, current_user):
+        submission = Submission.query.get(submission_id)
+        if not submission:
+            raise ValueError("Submission not found")
+
+        if not SubmissionManager.can_view_submission(submission, current_user):
+            raise PermissionError("Not allowed")
+
+        return submission
 
     @staticmethod
     def submit_homework(file_storage, assignment_id, current_user):
@@ -140,7 +154,6 @@ class SubmissionManager:
             current_user.role == UserRoleEnum.ADMIN
             or assignment.created_by == current_user.id
             or (not group.is_private and current_user.role == UserRoleEnum.TEACHER)
-            or current_user in group.members
         )
         if not allowed:
             raise PermissionError("Not allowed")

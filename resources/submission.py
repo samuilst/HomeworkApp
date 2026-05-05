@@ -1,14 +1,32 @@
-from flask import request
+import os
+
+from flask import Response, request, stream_with_context
 from flask_restful import Resource
 from marshmallow import ValidationError
 
 from manager.auth import auth
+from manager.s3_storage import S3Storage
 from manager.submission import SubmissionManager
 from schemas.submission import GradeSchema, SubmissionDeleteSchema, SubmissionUploadSchema
 
 upload_schema = SubmissionUploadSchema()
 grade_schema = GradeSchema()
 delete_schema = SubmissionDeleteSchema()
+
+
+def serialize_submission(submission):
+    return {
+        "submission_id": submission.submission_id,
+        "assignment_id": submission.assignment_id,
+        "assignment_title": submission.assignment.title,
+        "student_id": submission.student_id,
+        "student_name": submission.student.user_name,
+        "file_path": submission.file_path,
+        "download_url": f"/submissions/{submission.submission_id}/file",
+        "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
+        "grade": submission.grade,
+        "comment": submission.comment,
+    }
 
 
 class SubmissionCreateResource(Resource):
@@ -19,20 +37,7 @@ class SubmissionCreateResource(Resource):
         assignment_id = request.args.get("assignment_id", type=int)
         submissions = SubmissionManager.list_submissions(current_user, assignment_id)
         return {
-            "submissions": [
-                {
-                    "submission_id": submission.submission_id,
-                    "assignment_id": submission.assignment_id,
-                    "assignment_title": submission.assignment.title,
-                    "student_id": submission.student_id,
-                    "student_name": submission.student.user_name,
-                    "file_path": submission.file_path,
-                    "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
-                    "grade": submission.grade,
-                    "comment": submission.comment,
-                }
-                for submission in submissions
-            ]
+            "submissions": [serialize_submission(submission) for submission in submissions]
         }, 200
 
     @auth.login_required
@@ -105,3 +110,26 @@ class StudentSubmissionCountResource(Resource):
     def get(self, student_id):
         current_user = auth.current_user()
         return SubmissionManager.student_submission_count(student_id, current_user), 200
+
+
+class SubmissionFileResource(Resource):
+    @auth.login_required
+    def get(self, submission_id):
+        current_user = auth.current_user()
+        submission = SubmissionManager.get_visible_submission(submission_id, current_user)
+        s3_object, key = S3Storage.get_object(submission.file_path)
+        body = s3_object["Body"]
+        filename = os.path.basename(key) or "submission"
+
+        headers = {
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "private, max-age=300",
+        }
+        if s3_object.get("ContentLength") is not None:
+            headers["Content-Length"] = str(s3_object["ContentLength"])
+
+        return Response(
+            stream_with_context(body.iter_chunks()),
+            headers=headers,
+            mimetype=s3_object.get("ContentType") or "application/octet-stream",
+        )

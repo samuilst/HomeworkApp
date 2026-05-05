@@ -118,3 +118,16 @@ class GroupDetailResource(Resource):
                 for assignment in group.assignments
             ],
         }
+
+    @auth.login_required
+    def put(self, group_id):
+        current_user = auth.current_user()
+        data = group_schema.load(request.get_json() or {}, partial=True)
+        group = GroupManager.update_group(group_id, data, current_user)
+
+        return {
+            "id": group.id,
+            "name": group.name,
+            "is_private": group.is_private,
+            "owner_id": group.owner_id,
+        }, 200

@@ -40,6 +40,7 @@ def serialize_submission(submission):
         "student_id": submission.student_id,
         "student_name": submission.student.user_name if submission.student else None,
         "file_path": submission.file_path,
+        "download_url": f"/submissions/{submission.submission_id}/file",
         "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
         "grade": submission.grade,
         "comment": submission.comment,

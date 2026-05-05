@@ -4,12 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ClassHub | Homework OS</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
     <script src="https://unpkg.com/lucide@latest" defer></script>
-    <script src="/app.js" defer></script>
+    <script src="/app.js?v=20260505-11" defer></script>
   </head>
   <body>
     <div class="ambient">
@@ -22,7 +23,7 @@
     <main class="app-shell">
       <aside class="sidebar glass">
         <div class="brand">
-          <div class="brand-mark">CH</div>
+          <img class="brand-mark brand-icon" src="/favicon.svg" alt="" />
           <div>
             <strong>ClassHub</strong>
             <span>Homework OS</span>
@@ -129,12 +130,12 @@
 
           <section class="view" id="homeworkView">
             <div class="two-column">
-              <section class="panel glass">
+              <section class="panel glass role-teacher hidden">
                 <div class="panel-head"><h2>Groups</h2><i data-lucide="users"></i></div>
                 <div class="item-list" id="groupsList"></div>
               </section>
 
-              <section class="panel glass">
+              <section class="panel glass role-teacher hidden">
                 <div class="panel-head"><h2>Create group</h2><i data-lucide="folder-plus"></i></div>
                 <form id="groupForm" class="form-grid">
                   <label>Name<input name="name" maxlength="255" required /></label>
@@ -143,8 +144,13 @@
                 </form>
                 <form id="addUserForm" class="form-grid compact-form">
                   <label>Group<select name="group_id" required></select></label>
-                  <label>Student ID<input name="user_id" required /></label>
+                  <label>Student<select name="user_id" data-student-select="all" required></select></label>
                   <button class="secondary-button" type="submit"><i data-lucide="user-plus"></i><span>Add student</span></button>
+                </form>
+                <form id="removeUserForm" class="form-grid compact-form role-teacher hidden">
+                  <label>Group<select name="group_id" required></select></label>
+                  <label>Student<select name="user_id" data-student-select="owned" required></select></label>
+                  <button class="danger-button" type="submit"><i data-lucide="user-minus"></i><span>Remove student</span></button>
                 </form>
               </section>
 
@@ -168,7 +174,7 @@
                 <div class="panel-head"><h2>Grade and reports</h2><i data-lucide="badge-check"></i></div>
                 <form id="gradeForm" class="form-grid">
                   <label>Homework<select name="assignment_id" required></select></label>
-                  <label>Student ID<input name="student_id" required /></label>
+                  <label>Student<select name="student_id" data-student-select="owned" required></select></label>
                   <label>Grade<input name="grade" type="number" min="2" max="6" required /></label>
                   <label>Comment<textarea name="comment" rows="3"></textarea></label>
                   <button class="secondary-button" type="submit"><i data-lucide="check-circle-2"></i><span>Save grade</span></button>
@@ -178,6 +184,89 @@
                   <button class="ghost-button" type="submit"><i data-lucide="search"></i><span>Generate report</span></button>
                 </form>
                 <div class="item-list" id="missingList"></div>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="manageView">
+            <div class="two-column">
+              <section class="panel glass role-teacher span-2 hidden">
+                <div class="panel-head"><h2>Teacher dashboard</h2><i data-lucide="presentation"></i></div>
+                <div class="metric-grid compact-metrics">
+                  <div class="metric"><span>Groups</span><strong id="teacherGroupCount">0</strong><i data-lucide="users"></i></div>
+                  <div class="metric"><span>Students</span><strong id="teacherStudentCount">0</strong><i data-lucide="graduation-cap"></i></div>
+                  <div class="metric"><span>Homework</span><strong id="teacherAssignmentCount">0</strong><i data-lucide="clipboard-list"></i></div>
+                  <div class="metric"><span>Ungraded</span><strong id="teacherUngradedCount">0</strong><i data-lucide="badge-alert"></i></div>
+                </div>
+              </section>
+
+              <section class="panel glass role-teacher hidden">
+                <div class="panel-head"><h2>Create student</h2><i data-lucide="user-plus"></i></div>
+                <form id="teacherStudentForm" class="form-grid">
+                  <label>Username<input name="user_name" maxlength="10" autocomplete="off" required /></label>
+                  <label>Email<input name="email" type="email" autocomplete="off" required /></label>
+                  <label>Password<input name="password" type="password" autocomplete="new-password" required /></label>
+                  <label>Add to group<select name="group_id"></select></label>
+                  <button class="secondary-button" type="submit"><i data-lucide="user-plus"></i><span>Create student</span></button>
+                </form>
+              </section>
+
+              <section class="panel glass role-teacher hidden">
+                <div class="panel-head"><h2>My students</h2><i data-lucide="graduation-cap"></i></div>
+                <div class="item-list" id="teacherStudentsList"></div>
+              </section>
+
+              <section class="panel glass role-admin span-2 hidden">
+                <div class="panel-head"><h2>Admin stats</h2><i data-lucide="chart-no-axes-combined"></i></div>
+                <div class="metric-grid compact-metrics">
+                  <div class="metric"><span>Users</span><strong id="adminUsersCount">0</strong><i data-lucide="users"></i></div>
+                  <div class="metric"><span>Teachers</span><strong id="adminTeachersCount">0</strong><i data-lucide="presentation"></i></div>
+                  <div class="metric"><span>Students</span><strong id="adminStudentsCount">0</strong><i data-lucide="graduation-cap"></i></div>
+                  <div class="metric"><span>Ungraded</span><strong id="adminUngradedCount">0</strong><i data-lucide="badge-alert"></i></div>
+                </div>
+              </section>
+
+              <section class="panel glass role-admin hidden">
+                <div class="panel-head"><h2>Create user</h2><i data-lucide="user-cog"></i></div>
+                <form id="adminCreateUserForm" class="form-grid">
+                  <label>Username<input name="user_name" maxlength="10" autocomplete="off" required /></label>
+                  <label>Email<input name="email" type="email" autocomplete="off" required /></label>
+                  <label>Password<input name="password" type="password" autocomplete="new-password" required /></label>
+                  <label>Role
+                    <select name="role" required>
+                      <option value="STUDENT">Student</option>
+                      <option value="TEACHER">Teacher</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </label>
+                  <button class="primary-button" type="submit"><i data-lucide="plus"></i><span>Create user</span></button>
+                </form>
+              </section>
+
+              <section class="panel glass role-admin span-2 hidden">
+                <div class="panel-head"><h2>Users</h2><i data-lucide="users"></i></div>
+                <div class="toolbar">
+                  <button class="ghost-button" type="button" data-role-filter=""><i data-lucide="list"></i><span>All</span></button>
+                  <button class="ghost-button" type="button" data-role-filter="ADMIN"><i data-lucide="shield"></i><span>Admins</span></button>
+                  <button class="ghost-button" type="button" data-role-filter="TEACHER"><i data-lucide="presentation"></i><span>Teachers</span></button>
+                  <button class="ghost-button" type="button" data-role-filter="STUDENT"><i data-lucide="graduation-cap"></i><span>Students</span></button>
+                </div>
+                <div class="item-list" id="adminUsersList"></div>
+              </section>
+
+              <section class="panel glass role-admin hidden">
+                <div class="panel-head"><h2>All groups</h2><i data-lucide="folders"></i></div>
+                <div class="item-list" id="adminGroupsList"></div>
+              </section>
+
+              <section class="panel glass role-admin hidden">
+                <div class="panel-head"><h2>All homework</h2><i data-lucide="clipboard-list"></i></div>
+                <div class="item-list" id="adminAssignmentsList"></div>
+              </section>
+
+              <section class="panel glass role-admin span-2 hidden">
+                <div class="panel-head"><h2>All submissions</h2><i data-lucide="files"></i></div>
+                <div class="file-grid" id="adminSubmissionsList"></div>
               </section>
             </div>
           </section>
@@ -200,7 +289,7 @@ AWS_S3_BUCKET_NAME=your-bucket-name</pre>
               <section class="panel glass">
                 <div class="panel-head"><h2>Student activity</h2><i data-lucide="hash"></i></div>
                 <form id="countForm" class="form-grid">
-                  <label>Student ID<input name="student_id" required /></label>
+                  <label>Student<select name="student_id" data-student-select="owned" required></select></label>
                   <button class="secondary-button" type="submit"><i data-lucide="calculator"></i><span>Count uploads</span></button>
                 </form>
                 <div class="result-box" id="countResult">No student selected.</div>

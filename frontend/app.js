@@ -14,6 +14,43 @@ const state = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
+function setText(selector, value) {
+  const element = $(selector);
+  if (element) element.textContent = value;
+}
+
+function setHtml(selector, value) {
+  const element = $(selector);
+  if (element) element.innerHTML = value;
+}
+
+function toggleHidden(selector, isHidden) {
+  const element = $(selector);
+  if (element) element.classList.toggle("hidden", isHidden);
+}
+
+function bindSubmit(selector, handler) {
+  const form = $(selector);
+  if (form) form.addEventListener("submit", handler);
+}
+
+function getFormField(form, name) {
+  return form?.elements?.[name] || null;
+}
+
+function setFormField(form, name, value) {
+  const field = getFormField(form, name);
+  if (field) field.value = value;
+}
+
+function isChecked(form, name) {
+  return Boolean(getFormField(form, name)?.checked);
+}
+
+function resetForm(form) {
+  if (form instanceof HTMLFormElement) form.reset();
+}
+
 const routes = {
   "/dashboard": { view: "dashboardView", title: "Dashboard" },
   "/files": { view: "filesView", title: "Files" },
@@ -32,8 +69,28 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function currentRole() {
+  return state.user?.role || "";
+}
+
+function isAdmin() {
+  return currentRole() === "ADMIN";
+}
+
+function isTeacher() {
+  return currentRole() === "TEACHER" || isAdmin();
+}
+
+function isStudent() {
+  return currentRole() === "STUDENT";
+}
+
 function showToast(message, type = "success") {
   const toast = $("#toast");
+  if (!toast) {
+    console[type === "error" ? "error" : "log"](message);
+    return;
+  }
   toast.textContent = message;
   toast.className = `toast show ${type === "error" ? "error" : ""}`;
   window.clearTimeout(showToast.timer);
@@ -42,13 +99,18 @@ function showToast(message, type = "success") {
   }, 3200);
 }
 
+function canUseRoute(path) {
+  const route = routes[path];
+  return Boolean(route) && (!route.teacherOnly || isTeacher());
+}
+
 function setLoading(isLoading) {
   state.loading = isLoading;
   $$("button").forEach((button) => {
     const keepEnabled = button.id === "logoutButton" || button.classList.contains("nav-button") || button.classList.contains("tab");
     if (!keepEnabled) button.disabled = isLoading;
   });
-  $("#lastStatus").textContent = isLoading ? "Syncing" : "Ready";
+  setText("#lastStatus", isLoading ? "Syncing" : "Ready");
 }
 
 function setSession(token, user) {
@@ -141,7 +203,13 @@ async function api(path, options = {}) {
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(path, { ...options, headers });
+  let response;
+  try {
+    response = await fetch(path, { ...options, headers });
+  } catch (error) {
+    throw new Error("Server is not reachable. Check that Flask is running on port 5000.");
+  }
+
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
@@ -174,13 +242,26 @@ function readForm(form) {
   return result;
 }
 
+function compactPayload(data) {
+  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== "" && value !== null));
+}
+
+function readableErrorText(payload, response) {
+  if (payload && typeof payload === "object") {
+    return payload.message || payload.error || JSON.stringify(payload);
+  }
+
+  const text = String(payload || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return text || response.statusText || `HTTP ${response.status}`;
+}
+
 async function refreshData() {
   if (!state.token || state.loading) return;
 
   setLoading(true);
   showLoadingStates();
   try {
-    const [groupsData, assignmentsData, submissionsData] = await Promise.all([
+    const requests = [
       api("/groups"),
       api("/assignments"),
       api("/submissions"),
@@ -191,7 +272,7 @@ async function refreshData() {
     await refreshRoleData();
     renderAll();
   } catch (error) {
-    $("#lastStatus").textContent = "Error";
+    setText("#lastStatus", "Error");
     showToast(error.message, "error");
   } finally {
     setLoading(false);
@@ -219,7 +300,18 @@ async function refreshRoleData() {
 }
 
 function showLoadingStates() {
-  ["recentAssignments", "recentSubmissions", "groupsList", "assignmentsList", "submissionsList"].forEach((id) => {
+  [
+    "recentAssignments",
+    "recentSubmissions",
+    "groupsList",
+    "assignmentsList",
+    "submissionsList",
+    "teacherStudentsList",
+    "adminUsersList",
+    "adminGroupsList",
+    "adminAssignmentsList",
+    "adminSubmissionsList",
+  ].forEach((id) => {
     const element = $(`#${id}`);
     if (element && !element.children.length) {
       element.innerHTML = `<div class="loading-state">Loading</div>`;
@@ -246,11 +338,11 @@ function navigate(path, replace = false) {
 function renderRoute(path = normalizePath(location.pathname)) {
   const route = routes[path];
   $$(".view").forEach((view) => view.classList.remove("active"));
-  $(`#${route.view}`).classList.add("active");
+  $(`#${route.view}`)?.classList.add("active");
   $$(".nav-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.route === path);
   });
-  $("#viewTitle").textContent = route.title;
+  setText("#viewTitle", route.title);
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -262,6 +354,7 @@ function renderAll() {
   renderTeacher();
   renderAdmin();
   fillSelects();
+  updateShellRoleOnly();
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -317,15 +410,15 @@ function renderAdmin() {
 }
 
 function renderMetrics() {
-  $("#groupCount").textContent = state.groups.length;
-  $("#assignmentCount").textContent = state.assignments.length;
-  $("#submissionCount").textContent = state.submissions.length;
-  $("#recentAssignments").innerHTML = assignmentCards(state.assignments.slice(0, 4));
-  $("#recentSubmissions").innerHTML = fileCards(state.submissions.slice(0, 4), false);
+  setText("#groupCount", state.groups.length);
+  setText("#assignmentCount", state.assignments.length);
+  setText("#submissionCount", state.submissions.length);
+  setHtml("#recentAssignments", assignmentCards(state.assignments.slice(0, 4)));
+  setHtml("#recentSubmissions", fileCards(state.submissions.slice(0, 4), false));
 }
 
 function renderGroups() {
-  $("#groupsList").innerHTML = state.groups.length
+  setHtml("#groupsList", state.groups.length
     ? state.groups.map((group) => `
       <article class="item-card">
         <strong>${escapeHtml(group.name)}</strong>
@@ -334,9 +427,26 @@ function renderGroups() {
           <span class="pill blue">ID ${escapeHtml(group.id)}</span>
           <span class="pill ${group.private ? "coral" : "green"}">${group.private ? "Private" : "Public"}</span>
         </div>
+        ${isTeacher() ? groupManageMenu(group.id, group.name, group.private, false) : ""}
       </article>
     `).join("")
-    : emptyState("No groups yet. Create one to start organizing homework.");
+    : emptyState("No groups yet. Create one to start organizing homework."));
+}
+
+function groupManageMenu(id, name, isPrivate, adminView = false) {
+  return `
+    <details class="action-menu">
+      <summary><i data-lucide="settings-2"></i><span>Manage</span></summary>
+      <form class="inline-edit-form" data-edit-group="${escapeHtml(id)}">
+        <label>Name<input name="name" value="${escapeHtml(name)}" maxlength="255" required /></label>
+        <label class="check-row"><input name="is_private" type="checkbox" ${isPrivate ? "checked" : ""} /> Private group</label>
+        <button class="secondary-button" type="submit"><i data-lucide="save"></i><span>Save group</span></button>
+      </form>
+      ${adminView ? `
+        <button class="danger-button" type="button" data-delete-group="${escapeHtml(id)}"><i data-lucide="trash-2"></i><span>Delete group</span></button>
+      ` : ""}
+    </details>
+  `;
 }
 
 function assignmentCards(assignments) {
@@ -350,16 +460,37 @@ function assignmentCards(assignments) {
           <span class="pill gold">${assignment.due_date ? escapeHtml(assignment.due_date) : "No due date"}</span>
           <span class="pill">ID ${escapeHtml(assignment.id)}</span>
         </div>
+        ${isTeacher() ? `
+          <details class="action-menu">
+            <summary><i data-lucide="settings-2"></i><span>Manage</span></summary>
+            <form class="inline-edit-form" data-edit-assignment="${escapeHtml(assignment.id)}">
+              <label>Title<input name="title" value="${escapeHtml(assignment.title)}" maxlength="255" required /></label>
+              <label>Due date<input name="due_date" type="date" value="${assignment.due_date ? escapeHtml(assignment.due_date) : ""}" /></label>
+              <label>Description<textarea name="description" rows="3">${escapeHtml(assignment.description || "")}</textarea></label>
+              <button class="secondary-button" type="submit"><i data-lucide="save"></i><span>Save homework</span></button>
+            </form>
+            <button class="ghost-button" type="button" data-missing-assignment="${escapeHtml(assignment.id)}"><i data-lucide="search"></i><span>Missing</span></button>
+            <button class="danger-button" type="button" data-delete-assignment="${escapeHtml(assignment.id)}"><i data-lucide="trash-2"></i><span>Delete</span></button>
+          </details>
+        ` : ""}
       </article>
     `).join("")
-    : emptyState("No homework yet. Teachers can create assignments here.");
+    : emptyState(isStudent() ? "No homework assigned yet." : "No homework yet. Teachers can create assignments here.");
 }
 
 function renderAssignments() {
-  $("#assignmentsList").innerHTML = assignmentCards(state.assignments);
+  setHtml("#assignmentsList", assignmentCards(state.assignments));
 }
 
-function fileCards(submissions, grid = true) {
+function renderStudentGrades() {
+  if (!isStudent()) return;
+
+  setHtml("#studentGradesList", state.submissions.length
+    ? fileCards(state.submissions)
+    : emptyState("Submitted homework and grades will appear here."));
+}
+
+function fileCards(submissions, grid = true, admin = false) {
   return submissions.length
     ? submissions.map((submission) => `
       <article class="${grid ? "file-card" : "item-card"}">
@@ -369,16 +500,112 @@ function fileCards(submissions, grid = true) {
         <small>${escapeHtml(submission.file_path)}</small>
         <div class="pill-row">
           <span class="pill blue">Student ${escapeHtml(submission.student_id)}</span>
+          <span class="pill">Homework ${escapeHtml(submission.assignment_id)}</span>
           <span class="pill ${submission.grade ? "gold" : "coral"}">${submission.grade ? `Grade ${escapeHtml(submission.grade)}` : "Ungraded"}</span>
         </div>
+        ${submission.download_url ? `
+          <div class="card-actions">
+            <button class="ghost-button" type="button" data-open-file="${escapeHtml(submission.download_url)}">
+              <i data-lucide="external-link"></i><span>Open file</span>
+            </button>
+          </div>
+        ` : ""}
         ${submission.comment ? `<small class="meta">${escapeHtml(submission.comment)}</small>` : ""}
+        ${(isTeacher() || admin) ? `
+          <details class="action-menu">
+            <summary><i data-lucide="settings-2"></i><span>Manage</span></summary>
+            <form class="inline-edit-form" data-grade-submission="${escapeHtml(submission.assignment_id)}" data-student-id="${escapeHtml(submission.student_id)}">
+              <label>Grade<input name="grade" type="number" min="2" max="6" value="${submission.grade ? escapeHtml(submission.grade) : ""}" required /></label>
+              <label>Comment<textarea name="comment" rows="3">${escapeHtml(submission.comment || "")}</textarea></label>
+              <button class="secondary-button" type="submit"><i data-lucide="badge-check"></i><span>Save grade</span></button>
+            </form>
+            <button class="danger-button" type="button" data-delete-submission="${escapeHtml(submission.assignment_id)}" data-student-id="${escapeHtml(submission.student_id)}"><i data-lucide="trash-2"></i><span>Delete</span></button>
+          </details>
+        ` : ""}
       </article>
     `).join("")
     : emptyState("No uploaded files yet. Student submissions will appear here.");
 }
 
 function renderSubmissions() {
-  $("#submissionsList").innerHTML = fileCards(state.submissions);
+  setHtml("#submissionsList", fileCards(state.submissions));
+}
+
+function renderTeacherTools() {
+  if (!isTeacher()) return;
+  const dashboard = state.teacher.dashboard || {};
+  setText("#teacherGroupCount", dashboard.groups ?? 0);
+  setText("#teacherStudentCount", dashboard.students ?? 0);
+  setText("#teacherAssignmentCount", dashboard.assignments ?? 0);
+  setText("#teacherUngradedCount", dashboard.ungraded_submissions ?? 0);
+  setHtml("#teacherStudentsList", state.teacher.students.length
+    ? state.teacher.students.map(userCard).join("")
+    : emptyState("No students in your groups yet."));
+}
+
+function renderAdminTools() {
+  if (!isAdmin()) return;
+  const stats = state.admin.stats || {};
+  setText("#adminUsersCount", stats.users ?? 0);
+  setText("#adminTeachersCount", stats.teachers ?? 0);
+  setText("#adminStudentsCount", stats.students ?? 0);
+  setText("#adminUngradedCount", stats.ungraded_submissions ?? 0);
+
+  setHtml("#adminUsersList", state.admin.users.length
+    ? state.admin.users.map((user) => userCard(user, true)).join("")
+    : emptyState("No users found."));
+
+  setHtml("#adminGroupsList", state.admin.groups.length
+    ? state.admin.groups.map((group) => `
+      <article class="item-card">
+        <strong>${escapeHtml(group.name)}</strong>
+        <small>Owner ${escapeHtml(group.owner_id)} - ${escapeHtml(group.member_count)} member(s)</small>
+        <div class="pill-row">
+          <span class="pill blue">ID ${escapeHtml(group.id)}</span>
+          <span class="pill ${group.is_private ? "coral" : "green"}">${group.is_private ? "Private" : "Public"}</span>
+        </div>
+        ${groupManageMenu(group.id, group.name, group.is_private, true)}
+      </article>
+    `).join("")
+    : emptyState("No groups found."));
+
+  setHtml("#adminAssignmentsList", state.admin.assignments.length
+    ? assignmentCards(state.admin.assignments)
+    : emptyState("No homework found."));
+
+  setHtml("#adminSubmissionsList", fileCards(state.admin.submissions, true, true));
+}
+
+function userCard(user, adminActions = false) {
+  return `
+    <article class="item-card">
+      <strong>${escapeHtml(user.user_name)}</strong>
+      <small>${escapeHtml(user.email)}</small>
+      <div class="pill-row">
+        <span class="pill blue">ID ${escapeHtml(user.id)}</span>
+        <span class="pill ${user.role === "ADMIN" ? "coral" : user.role === "TEACHER" ? "gold" : "green"}">${escapeHtml(user.role)}</span>
+      </div>
+      ${adminActions ? `
+        <details class="action-menu">
+          <summary><i data-lucide="settings-2"></i><span>Manage</span></summary>
+          <form class="inline-edit-form" data-edit-user="${escapeHtml(user.id)}">
+            <label>Username<input name="user_name" value="${escapeHtml(user.user_name)}" maxlength="50" required /></label>
+            <label>Email<input name="email" type="email" value="${escapeHtml(user.email)}" required /></label>
+            <label>New password<input name="password" type="password" autocomplete="new-password" /></label>
+            <label>Role
+              <select name="role" required>
+                <option value="STUDENT" ${user.role === "STUDENT" ? "selected" : ""}>Student</option>
+                <option value="TEACHER" ${user.role === "TEACHER" ? "selected" : ""}>Teacher</option>
+                <option value="ADMIN" ${user.role === "ADMIN" ? "selected" : ""}>Admin</option>
+              </select>
+            </label>
+            <button class="secondary-button" type="submit"><i data-lucide="save"></i><span>Save user</span></button>
+          </form>
+          <button class="danger-button" type="button" data-delete-user="${escapeHtml(user.id)}"><i data-lucide="trash-2"></i><span>Delete</span></button>
+        </details>
+      ` : ""}
+    </article>
+  `;
 }
 
 function emptyState(message) {
@@ -394,8 +621,19 @@ function fillSelects() {
     .map((assignment) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(assignment.title)} &middot; ${escapeHtml(assignment.id)}</option>`)
     .join("");
 
+  const studentOption = (student) => `
+    <option value="${escapeHtml(student.id)}">${escapeHtml(student.user_name)} - ${escapeHtml(student.email)}</option>
+  `;
+  const allStudentOptions = state.teacher.availableStudents.map(studentOption).join("");
+  const ownedStudentOptions = state.teacher.students.map(studentOption).join("");
+
   $$('select[name="group_id"]').forEach((select) => {
-    select.innerHTML = groupOptions || `<option value="">No groups available</option>`;
+    const isTeacherStudentSelect = select.closest("#teacherStudentForm");
+    if (isTeacherStudentSelect) {
+      select.innerHTML = `<option value="">Do not add yet</option>${teacherGroupOptions || groupOptions}`;
+    } else {
+      select.innerHTML = groupOptions || `<option value="">No groups available</option>`;
+    }
   });
 
   $$('select[name="assignment_id"]').forEach((select) => {
@@ -448,17 +686,18 @@ function bindNavigation() {
     tab.addEventListener("click", () => {
       $$(".tab").forEach((item) => item.classList.remove("active"));
       tab.classList.add("active");
-      $("#loginForm").classList.toggle("hidden", tab.dataset.authTab !== "login");
-      $("#registerForm").classList.toggle("hidden", tab.dataset.authTab !== "register");
+      toggleHidden("#loginForm", tab.dataset.authTab !== "login");
+      toggleHidden("#registerForm", tab.dataset.authTab !== "register");
     });
   });
 }
 
 function bindForms() {
-  $("#loginForm").addEventListener("submit", async (event) => {
+  bindSubmit("#loginForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       const payload = await api("/login", { method: "POST", body: JSON.stringify(data) });
       setSession(payload.token, authUserFromPayload(payload, { email: data.email }));
       showToast("Signed in");
@@ -467,8 +706,9 @@ function bindForms() {
     }
   });
 
-  $("#registerForm").addEventListener("submit", async (event) => {
+  bindSubmit("#registerForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
       const data = readForm(event.currentTarget);
       const payload = await api("/register", { method: "POST", body: JSON.stringify(data) });
@@ -480,13 +720,14 @@ function bindForms() {
     }
   });
 
-  $("#groupForm").addEventListener("submit", async (event) => {
+  bindSubmit("#groupForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
-      data.is_private = event.currentTarget.elements.is_private.checked;
+      const data = readForm(form);
+      data.is_private = isChecked(form, "is_private");
       await api("/groups", { method: "POST", body: JSON.stringify(data) });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Group created");
     } catch (error) {
@@ -494,28 +735,46 @@ function bindForms() {
     }
   });
 
-  $("#addUserForm").addEventListener("submit", async (event) => {
+  bindSubmit("#addUserForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       await api(`/groups/${data.group_id}/users`, {
         method: "POST",
         body: JSON.stringify({ user_id: data.user_id }),
       });
-      event.currentTarget.reset();
+      resetForm(form);
+      await refreshData();
       showToast("Student added");
     } catch (error) {
       showToast(error.message, "error");
     }
   });
 
-  $("#assignmentForm").addEventListener("submit", async (event) => {
+  bindSubmit("#removeUserForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
+      await api(`/groups/${data.group_id}/users/${encodeURIComponent(data.user_id)}`, { method: "DELETE" });
+      resetForm(form);
+      await refreshData();
+      showToast("Student removed");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+
+  bindSubmit("#assignmentForm", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+      const data = readForm(form);
       if (!data.due_date) delete data.due_date;
+      data.group_id = Number(data.group_id);
       await api("/assignments", { method: "POST", body: JSON.stringify(data) });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Homework created");
     } catch (error) {
@@ -523,12 +782,13 @@ function bindForms() {
     }
   });
 
-  $("#uploadForm").addEventListener("submit", async (event) => {
+  bindSubmit("#uploadForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = new FormData(event.currentTarget);
+      const data = new FormData(form);
       await api("/submissions", { method: "POST", body: data });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("File uploaded to S3");
     } catch (error) {
@@ -536,15 +796,16 @@ function bindForms() {
     }
   });
 
-  $("#gradeForm").addEventListener("submit", async (event) => {
+  bindSubmit("#gradeForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       await api(`/submissions/${data.assignment_id}/${encodeURIComponent(data.student_id)}`, {
         method: "PUT",
         body: JSON.stringify({ grade: Number(data.grade), comment: data.comment || null }),
       });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Grade saved");
     } catch (error) {
@@ -552,32 +813,53 @@ function bindForms() {
     }
   });
 
-  $("#reportForm").addEventListener("submit", async (event) => {
+  bindSubmit("#reportForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
-      const payload = await api(`/assignments/${data.assignment_id}/missing-submissions`);
-      $("#missingList").innerHTML = payload.missing_students?.length
-        ? payload.missing_students.map((student) => `
-          <article class="item-card">
-            <strong>${escapeHtml(student.user_name)}</strong>
-            <small>${escapeHtml(student.email)}</small>
-            <span class="pill coral">ID ${escapeHtml(student.id)}</span>
-          </article>
-        `).join("")
-        : emptyState("Everyone submitted this homework.");
-      showToast(`Missing submissions: ${payload.missing_count}`);
+      const data = readForm(form);
+      await renderMissingReport(data.assignment_id);
     } catch (error) {
       showToast(error.message, "error");
     }
   });
 
-  $("#countForm").addEventListener("submit", async (event) => {
+  bindSubmit("#countForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       const payload = await api(`/students/${encodeURIComponent(data.student_id)}/submission-count`);
-      $("#countResult").textContent = `${payload.user_name}: ${payload.submission_count} uploaded file(s)`;
+      setText("#countResult", `${payload.user_name}: ${payload.submission_count} uploaded file(s)`);
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+
+  bindSubmit("#teacherStudentForm", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+      const data = compactPayload(readForm(form));
+      if (data.group_id) data.group_id = Number(data.group_id);
+      await api("/teacher/students", { method: "POST", body: JSON.stringify(data) });
+      resetForm(form);
+      await refreshData();
+      showToast("Student created");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+
+  bindSubmit("#adminCreateUserForm", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+      const data = readForm(form);
+      await api("/admin/users", { method: "POST", body: JSON.stringify(data) });
+      resetForm(form);
+      await refreshData();
+      showToast("User created");
     } catch (error) {
       showToast(error.message, "error");
     }
