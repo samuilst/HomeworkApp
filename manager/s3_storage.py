@@ -30,6 +30,18 @@ class S3Storage:
         return bucket
 
     @staticmethod
+    def split_s3_path(file_path):
+        if not file_path or not file_path.startswith("s3://"):
+            return None, None
+
+        without_scheme = file_path[5:]
+        bucket, _, key = without_scheme.partition("/")
+        if not bucket or not key:
+            return None, None
+
+        return bucket, key
+
+    @staticmethod
     def _storage_error_message(error):
         try:
             from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
@@ -75,15 +87,26 @@ class S3Storage:
 
     @staticmethod
     def delete(file_path):
-        if not file_path or not file_path.startswith("s3://"):
-            return
-
-        without_scheme = file_path[5:]
-        bucket, _, key = without_scheme.partition("/")
+        bucket, key = S3Storage.split_s3_path(file_path)
         if not bucket or not key:
             return
 
         try:
             S3Storage._client().delete_object(Bucket=bucket, Key=key)
+        except Exception as exc:
+            raise RuntimeError(S3Storage._storage_error_message(exc)) from exc
+
+    @staticmethod
+    def presigned_url(file_path, expires_in=3600):
+        bucket, key = S3Storage.split_s3_path(file_path)
+        if not bucket or not key:
+            return None
+
+        try:
+            return S3Storage._client().generate_presigned_url(
+                "get_object",
+                Params={"Bucket": bucket, "Key": key},
+                ExpiresIn=expires_in,
+            )
         except Exception as exc:
             raise RuntimeError(S3Storage._storage_error_message(exc)) from exc

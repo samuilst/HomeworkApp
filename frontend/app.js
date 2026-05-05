@@ -419,6 +419,13 @@ function fileCards(submissions, grid = true, admin = false) {
           <span class="pill">Homework ${escapeHtml(submission.assignment_id)}</span>
           <span class="pill ${submission.grade ? "gold" : "coral"}">${submission.grade ? `Grade ${escapeHtml(submission.grade)}` : "Ungraded"}</span>
         </div>
+        ${submission.download_url ? `
+          <div class="card-actions">
+            <a class="ghost-button" href="${escapeHtml(submission.download_url)}" target="_blank" rel="noopener noreferrer">
+              <i data-lucide="external-link"></i><span>Open file</span>
+            </a>
+          </div>
+        ` : ""}
         ${submission.comment ? `<small class="meta">${escapeHtml(submission.comment)}</small>` : ""}
         ${(isTeacher() || admin) ? `
           <details class="action-menu">
