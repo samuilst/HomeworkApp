@@ -264,6 +264,7 @@ GET    /admin/users
 POST   /admin/users
 GET    /admin/users/<user_id>
 PUT    /admin/users/<user_id>
+PATCH  /admin/users/<user_id>/role
 DELETE /admin/users/<user_id>
 GET    /admin/groups
 GET    /admin/assignments
@@ -276,6 +277,7 @@ Admin users can:
 - List all users
 - Create users with `STUDENT`, `TEACHER`, or `ADMIN` role
 - Update user profile data and role
+- Change only a user's role through `PATCH /admin/users/<user_id>/role`
 - Delete users
 - View all groups, assignments, and submissions
 

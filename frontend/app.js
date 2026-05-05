@@ -45,7 +45,8 @@ function showToast(message, type = "success") {
 function setLoading(isLoading) {
   state.loading = isLoading;
   $$("button").forEach((button) => {
-    if (button.id !== "logoutButton") button.disabled = isLoading;
+    const keepEnabled = button.id === "logoutButton" || button.classList.contains("nav-button") || button.classList.contains("tab");
+    if (!keepEnabled) button.disabled = isLoading;
   });
   $("#lastStatus").textContent = isLoading ? "Syncing" : "Ready";
 }
@@ -83,6 +84,7 @@ function updateShell() {
   $("#avatar").textContent = (state.user?.email || state.user?.user_name || "?").slice(0, 1).toUpperCase();
   $("#logoutButton").style.visibility = isLogged ? "visible" : "hidden";
   updateRoleNavigation();
+  updateRoleSections();
   if (isLogged) refreshData();
   if (window.lucide) window.lucide.createIcons();
 }
@@ -91,6 +93,13 @@ function updateRoleNavigation() {
   const role = state.user?.role;
   $$(".teacher-nav").forEach((item) => item.classList.toggle("hidden", !["TEACHER", "ADMIN"].includes(role)));
   $$(".admin-nav").forEach((item) => item.classList.toggle("hidden", role !== "ADMIN"));
+}
+
+function updateRoleSections() {
+  const role = state.user?.role;
+  $$(".student-only").forEach((item) => item.classList.toggle("hidden", role !== "STUDENT"));
+  $$(".teacher-only").forEach((item) => item.classList.toggle("hidden", !["TEACHER", "ADMIN"].includes(role)));
+  $$(".admin-only").forEach((item) => item.classList.toggle("hidden", role !== "ADMIN"));
 }
 
 async function api(path, options = {}) {
@@ -105,12 +114,19 @@ async function api(path, options = {}) {
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message = payload?.message || payload?.error || "Request failed";
-    const details = payload?.errors ? ` ${JSON.stringify(payload.errors)}` : "";
+    const message = payload?.message || payload?.error || `Request failed (${response.status})`;
+    const details = payload?.errors ? ` ${formatErrors(payload.errors)}` : "";
     throw new Error(`${message}${details}`);
   }
 
   return payload;
+}
+
+function formatErrors(errors) {
+  if (typeof errors === "string") return errors;
+  return Object.entries(errors)
+    .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(", ") : messages}`)
+    .join("; ");
 }
 
 function readForm(form) {
@@ -350,9 +366,9 @@ function fillSelects() {
     select.innerHTML = assignmentOptions || `<option value="">No homework available</option>`;
   });
 
-  const optionalGroupOptions = `<option value="">Do not add to group</option>${groupOptions}`;
   $$('#teacherCreateStudentForm select[name="group_id"]').forEach((select) => {
-    select.innerHTML = optionalGroupOptions;
+    select.innerHTML = groupOptions || `<option value="">Create a group first</option>`;
+    select.disabled = !groupOptions;
   });
 }
 
@@ -365,10 +381,17 @@ function bindRoleForms() {
       try {
         const userId = event.currentTarget.dataset.userId;
         const role = event.currentTarget.elements.role.value;
-        await api(`/admin/users/${encodeURIComponent(userId)}`, {
-          method: "PUT",
+        await api(`/admin/users/${encodeURIComponent(userId)}/role`, {
+          method: "PATCH",
           body: JSON.stringify({ role }),
         });
+        if (state.user?.user_id === userId) {
+          state.user.role = role;
+          localStorage.setItem("classhub_user", JSON.stringify(state.user));
+          updateRoleNavigation();
+          updateRoleSections();
+          navigate(normalizePath(location.pathname), true);
+        }
         await refreshData();
         showToast("User role updated");
       } catch (error) {
@@ -528,7 +551,9 @@ function bindForms() {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
-      if (!data.group_id) delete data.group_id;
+      if (!data.group_id) {
+        throw new Error("Create a group first, then create the student inside that group.");
+      }
       await api("/teacher/students", { method: "POST", body: JSON.stringify(data) });
       event.currentTarget.reset();
       await refreshData();

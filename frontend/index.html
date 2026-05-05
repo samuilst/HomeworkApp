@@ -116,7 +116,7 @@
                 <div class="panel-head"><h2>File grid</h2><i data-lucide="folder-open"></i></div>
                 <div class="file-grid" id="submissionsList"></div>
               </section>
-              <section class="panel glass">
+              <section class="panel glass student-only">
                 <div class="panel-head"><h2>Upload solution</h2><i data-lucide="cloud-upload"></i></div>
                 <form id="uploadForm" class="form-grid" enctype="multipart/form-data">
                   <label>Homework<select name="assignment_id" required></select></label>
@@ -153,7 +153,7 @@
                 <div class="homework-board" id="assignmentsList"></div>
               </section>
 
-              <section class="panel glass">
+              <section class="panel glass teacher-only">
                 <div class="panel-head"><h2>Create homework</h2><i data-lucide="square-pen"></i></div>
                 <form id="assignmentForm" class="form-grid">
                   <label>Group<select name="group_id" required></select></label>
@@ -164,7 +164,7 @@
                 </form>
               </section>
 
-              <section class="panel glass">
+              <section class="panel glass teacher-only">
                 <div class="panel-head"><h2>Grade and reports</h2><i data-lucide="badge-check"></i></div>
                 <form id="gradeForm" class="form-grid">
                   <label>Homework<select name="assignment_id" required></select></label>

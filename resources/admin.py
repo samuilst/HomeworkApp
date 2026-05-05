@@ -3,10 +3,11 @@ from flask_restful import Resource
 
 from manager.admin import AdminManager, serialize_user
 from manager.auth import auth
-from schemas.admin import AdminUserCreateSchema, AdminUserUpdateSchema
+from schemas.admin import AdminUserCreateSchema, AdminUserRoleUpdateSchema, AdminUserUpdateSchema
 
 create_user_schema = AdminUserCreateSchema()
 update_user_schema = AdminUserUpdateSchema()
+role_update_schema = AdminUserRoleUpdateSchema()
 
 
 def serialize_group(group):
@@ -80,6 +81,15 @@ class AdminUserDetailResource(Resource):
         current_user = auth.current_user()
         AdminManager.delete_user(user_id, current_user)
         return {"message": "User deleted"}, 200
+
+
+class AdminUserRoleResource(Resource):
+    @auth.login_required
+    def patch(self, user_id):
+        current_user = auth.current_user()
+        data = role_update_schema.load(request.get_json() or {})
+        user = AdminManager.update_user(user_id, {"role": data["role"]}, current_user)
+        return {"user": serialize_user(user)}, 200
 
 
 class AdminStatsResource(Resource):
