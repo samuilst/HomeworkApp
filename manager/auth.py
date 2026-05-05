@@ -38,18 +38,7 @@ class AuthManager:
         except jwt.exceptions.InvalidTokenError as ex:
             raise Exception("Please login again")
 
-    @auth.verify_token
-    def verify_token(token):
-        try:
-            user = AuthManager.decode_token(token)
-            return user
-        except Exception:
-            return None
-
-    @auth.error_handler
-    def auth_error(status):
-        return {"message": "Unauthorized. Please sign in again."}, status
-
+    @staticmethod
     def permission_required(required_role):
         def decorator(function):
             def decorator_function(*args, **kwargs):
@@ -61,6 +50,20 @@ class AuthManager:
             return decorator_function
 
         return decorator
+
+
+@auth.verify_token
+def verify_token(token):
+    try:
+        user = AuthManager.decode_token(token)
+        return user
+    except Exception:
+        return None
+
+
+@auth.error_handler
+def auth_error(status):
+    return {"message": "Unauthorized. Please sign in again."}, status
 
 
 def validate_schema(schema):
