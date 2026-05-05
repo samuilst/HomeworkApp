@@ -1,4 +1,4 @@
-from resources.user import UserRegistryResource, UserSignInResource
+from resources.user import UserRegisterResource, UserRegistryResource, UserSignInResource
 
 from resources.group import GroupListResource
 from resources.group import GroupAddUserResource
@@ -27,7 +27,7 @@ from resources.teacher import TeacherGroupsResource
 from resources.teacher import TeacherStudentsResource
 
 routes = (
-    (UserRegistryResource, "/registry"),
+    (UserRegistryResource, "/registry", "/register"),
     (UserSignInResource, "/login"),
 
     (GroupListResource, "/groups"),

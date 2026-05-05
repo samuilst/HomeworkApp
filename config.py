@@ -29,6 +29,7 @@ def create_app(config_class = 'config.DevelopmentConfig'):
     app.config.from_object(config_class)
     frontend_folder = os.path.join(app.root_path, "frontend")
 
+    db.init_app(app)
     api = Api(app)
     migrate = Migrate(app, db)
 
@@ -48,7 +49,8 @@ def create_app(config_class = 'config.DevelopmentConfig'):
     def handle_runtime_error(error):
         return {"message": str(error)}, 500
 
-    [api.add_resource(*route) for route in routes]
+    for route in routes:
+        api.add_resource(*route)
 
     @app.route("/")
     def frontend_index():

@@ -12,13 +12,13 @@ class BaseUserSchema(Schema):
     email = fields.Email(required=True)
     user_name = fields.String(
         required=True,
-        validate=validate.Length(min=2, max=10)
+        validate=validate.Length(min=2, max=50)
     )
 
 class PasswordValidationMixin:
     password = fields.String(required=True, load_only=True)
 
-    password_error = 'invalid password'
+    password_error = 'Password must be at least 10 characters and include an uppercase letter, a number, and a special character.'
 
     @validates('password')
     def validate_password(self, value, **kwargs):

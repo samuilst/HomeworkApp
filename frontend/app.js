@@ -59,6 +59,16 @@ function setSession(token, user) {
   updateShell();
 }
 
+function authUserFromPayload(payload, fallback = {}) {
+  const user = payload.user || {};
+  return {
+    user_id: user.user_id || payload.user_id,
+    user_name: user.user_name || payload.user_name || fallback.user_name || "",
+    email: user.email || payload.email || fallback.email || "",
+    role: user.role || payload.role || fallback.role || "STUDENT",
+  };
+}
+
 function clearSession() {
   state.token = null;
   state.user = null;
@@ -355,7 +365,7 @@ function fileCards(submissions, grid = true) {
       <article class="${grid ? "file-card" : "item-card"}">
         ${grid ? `<div class="file-icon"><i data-lucide="file-text"></i></div>` : ""}
         <strong>${escapeHtml(submission.assignment_title || "Submission")}</strong>
-        <small>${escapeHtml(submission.student_name || submission.student_id)} · ${submission.submitted_at ? new Date(submission.submitted_at).toLocaleString("en-GB") : "No time"}</small>
+        <small>${escapeHtml(submission.student_name || submission.student_id)} &middot; ${submission.submitted_at ? new Date(submission.submitted_at).toLocaleString("en-GB") : "No time"}</small>
         <small>${escapeHtml(submission.file_path)}</small>
         <div class="pill-row">
           <span class="pill blue">Student ${escapeHtml(submission.student_id)}</span>
@@ -377,11 +387,11 @@ function emptyState(message) {
 
 function fillSelects() {
   const groupOptions = state.groups
-    .map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)} · ${escapeHtml(group.id)}</option>`)
+    .map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)} &middot; ${escapeHtml(group.id)}</option>`)
     .join("");
 
   const assignmentOptions = state.assignments
-    .map((assignment) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(assignment.title)} · ${escapeHtml(assignment.id)}</option>`)
+    .map((assignment) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(assignment.title)} &middot; ${escapeHtml(assignment.id)}</option>`)
     .join("");
 
   $$('select[name="group_id"]').forEach((select) => {
@@ -450,7 +460,7 @@ function bindForms() {
     try {
       const data = readForm(event.currentTarget);
       const payload = await api("/login", { method: "POST", body: JSON.stringify(data) });
-      setSession(payload.token, { email: data.email, user_id: payload.user_id, role: payload.role });
+      setSession(payload.token, authUserFromPayload(payload, { email: data.email }));
       showToast("Signed in");
     } catch (error) {
       showToast(error.message, "error");
@@ -461,8 +471,8 @@ function bindForms() {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
-      const payload = await api("/registry", { method: "POST", body: JSON.stringify(data) });
-      setSession(payload.token, { email: data.email, user_name: data.user_name, user_id: payload.user_id, role: "STUDENT" });
+      const payload = await api("/register", { method: "POST", body: JSON.stringify(data) });
+      setSession(payload.token, authUserFromPayload(payload, { email: data.email, user_name: data.user_name, role: "STUDENT" }));
       event.currentTarget.reset();
       showToast("Student account created");
     } catch (error) {

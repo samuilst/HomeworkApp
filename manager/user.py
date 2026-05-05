@@ -23,8 +23,6 @@ class UserManager:
         db.session.add(user)
         db.session.commit()
 
-        token = user.encode_token()
-
         return user
 
     @staticmethod
@@ -32,14 +30,10 @@ class UserManager:
         user = UserModel.query.filter_by(email=user_data['email']).first()
 
         if not user or not check_password_hash((user.password), user_data['password']):
-            return {'message': 'Invalid password'}, 400
+            raise ValueError("Invalid email or password")
 
         return user
 
     @staticmethod
     def get_user_by_id(user_id):
-        # @auth.login_required
-        # # @permission_requred(UserRoleEnum.ADMIN)
-        #     current_user = auth.current_user()
-
-            return UserModel.query.filter_by(id=user_id).first()
+        return UserModel.query.filter_by(id=user_id).first()

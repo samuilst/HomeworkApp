@@ -80,10 +80,10 @@
             </form>
 
             <form id="registerForm" class="form-grid hidden">
-              <label>Username<input name="user_name" maxlength="10" autocomplete="username" required /></label>
+              <label>Username<input name="user_name" minlength="2" maxlength="50" autocomplete="username" required /></label>
               <label>Email<input name="email" type="email" autocomplete="email" required /></label>
-              <label>Password<input name="password" type="password" autocomplete="new-password" required /></label>
-              <div class="notice"><i data-lucide="shield-check"></i><span>Public registration creates a Student account only.</span></div>
+              <label>Password<input name="password" type="password" autocomplete="new-password" minlength="10" pattern="(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{10,}" title="Use at least 10 characters with an uppercase letter, a number, and a special character." required /></label>
+              <div class="notice"><i data-lucide="shield-check"></i><span>Student account only. Password needs 10+ chars, uppercase, number, and symbol.</span></div>
               <button class="primary-button full" type="submit"><i data-lucide="user-plus"></i><span>Create student account</span></button>
             </form>
           </div>
@@ -223,9 +223,9 @@ AWS_S3_BUCKET_NAME=your-bucket-name</pre>
               <section class="panel glass">
                 <div class="panel-head"><h2>Create student</h2><i data-lucide="user-plus"></i></div>
                 <form id="teacherCreateStudentForm" class="form-grid">
-                  <label>Username<input name="user_name" maxlength="10" required /></label>
+                  <label>Username<input name="user_name" minlength="2" maxlength="50" required /></label>
                   <label>Email<input name="email" type="email" required /></label>
-                  <label>Password<input name="password" type="password" required /></label>
+                  <label>Password<input name="password" type="password" minlength="10" pattern="(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{10,}" title="Use at least 10 characters with an uppercase letter, a number, and a special character." required /></label>
                   <label>Optional group<select name="group_id"></select></label>
                   <button class="primary-button" type="submit"><i data-lucide="plus"></i><span>Create student</span></button>
                 </form>
@@ -250,7 +250,7 @@ AWS_S3_BUCKET_NAME=your-bucket-name</pre>
                 <form id="adminCreateUserForm" class="form-grid">
                   <label>Username<input name="user_name" maxlength="50" required /></label>
                   <label>Email<input name="email" type="email" required /></label>
-                  <label>Password<input name="password" type="password" required /></label>
+                  <label>Password<input name="password" type="password" minlength="10" pattern="(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{10,}" title="Use at least 10 characters with an uppercase letter, a number, and a special character." required /></label>
                   <label>Role
                     <select name="role" required>
                       <option value="STUDENT">STUDENT</option>
