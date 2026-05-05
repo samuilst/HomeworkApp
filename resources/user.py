@@ -57,8 +57,8 @@ class UserSignInResource(Resource):
 
         user = UserModel.query.filter_by(email=data['email']).first()
 
-        if not user or not check_password_hash((user.password), data['password']):
-            return {'message': 'Invalid password'}, 400
+        if not user or not check_password_hash(user.password, data['password']):
+            return {'message': 'Invalid email or password'}, 400
 
         return {
             "message": "User login successfully!",
@@ -73,7 +73,9 @@ class UserSignInResource(Resource):
         current_user = auth.current_user()
 
         return {
-            "message": "User profile retrieved seccesufully",
+            "message": "User profile retrieved successfully",
             "user_id": current_user.id,
             "user_name": current_user.user_name,
+            "email": current_user.email,
+            "role": current_user.role.value,
         }, 200

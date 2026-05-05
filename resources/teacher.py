@@ -29,6 +29,8 @@ class TeacherStudentsResource(Resource):
     @auth.login_required
     def get(self):
         current_user = auth.current_user()
+        if request.args.get("scope") == "all":
+            return {"students": TeacherManager.serialize_available_students(current_user)}, 200
         return {"students": TeacherManager.serialize_students(current_user)}, 200
 
     @auth.login_required

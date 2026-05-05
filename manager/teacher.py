@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from werkzeug.security import generate_password_hash
 
 from db import db
@@ -30,7 +31,12 @@ class TeacherManager:
             for member in group.members:
                 if member.role == UserRoleEnum.STUDENT:
                     students_by_id[member.id] = member
-        return list(students_by_id.values())
+        return sorted(students_by_id.values(), key=lambda student: student.user_name.lower())
+
+    @staticmethod
+    def available_students(current_user):
+        require_teacher_or_admin(current_user)
+        return UserModel.query.filter_by(role=UserRoleEnum.STUDENT).order_by(func.lower(UserModel.user_name).asc()).all()
 
     @staticmethod
     def create_student(data, current_user):
@@ -81,3 +87,7 @@ class TeacherManager:
     @staticmethod
     def serialize_students(current_user):
         return [serialize_user(student) for student in TeacherManager.students(current_user)]
+
+    @staticmethod
+    def serialize_available_students(current_user):
+        return [serialize_user(student) for student in TeacherManager.available_students(current_user)]

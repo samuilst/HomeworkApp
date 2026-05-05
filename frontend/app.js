@@ -4,7 +4,7 @@ const state = {
   groups: [],
   assignments: [],
   submissions: [],
-  teacher: { dashboard: null, groups: [], students: [] },
+  teacher: { dashboard: null, groups: [], students: [], availableStudents: [] },
   admin: { stats: null, users: [], groups: [], assignments: [], submissions: [], roleFilter: "" },
   loading: false,
 };
@@ -45,12 +45,16 @@ function isChecked(form, name) {
   return Boolean(getFormField(form, name)?.checked);
 }
 
+function resetForm(form) {
+  if (form instanceof HTMLFormElement) form.reset();
+}
+
 const routes = {
   "/dashboard": { view: "dashboardView", title: "Dashboard" },
   "/files": { view: "filesView", title: "Files" },
   "/homework": { view: "homeworkView", title: "Homework" },
-  "/manage": { view: "manageView", title: "Manage" },
-  "/settings": { view: "settingsView", title: "Settings" },
+  "/manage": { view: "manageView", title: "Manage", teacherOnly: true },
+  "/settings": { view: "settingsView", title: "Settings", teacherOnly: true },
 };
 
 function escapeHtml(value) {
@@ -74,6 +78,10 @@ function isTeacher() {
   return currentRole() === "TEACHER" || isAdmin();
 }
 
+function isStudent() {
+  return currentRole() === "STUDENT";
+}
+
 function showToast(message, type = "success") {
   const toast = $("#toast");
   if (!toast) {
@@ -86,6 +94,11 @@ function showToast(message, type = "success") {
   showToast.timer = window.setTimeout(() => {
     toast.className = "toast";
   }, 3200);
+}
+
+function canUseRoute(path) {
+  const route = routes[path];
+  return Boolean(route) && (!route.teacherOnly || isTeacher());
 }
 
 function setLoading(isLoading) {
@@ -110,7 +123,7 @@ function clearSession() {
   state.groups = [];
   state.assignments = [];
   state.submissions = [];
-  state.teacher = { dashboard: null, groups: [], students: [] };
+  state.teacher = { dashboard: null, groups: [], students: [], availableStudents: [] };
   state.admin = { stats: null, users: [], groups: [], assignments: [], submissions: [], roleFilter: "" };
   localStorage.removeItem("classhub_token");
   localStorage.removeItem("classhub_user");
@@ -131,6 +144,7 @@ function updateShell() {
   $$(".role-admin").forEach((element) => element.classList.toggle("hidden", !isAdmin()));
   $$(".role-teacher").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
   $$(".role-manage").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
+  $$(".role-student").forEach((element) => element.classList.toggle("hidden", !isStudent()));
 
   if (isLogged) refreshData();
   if (window.lucide) window.lucide.createIcons();
@@ -188,7 +202,12 @@ async function refreshData() {
     ];
 
     if (isTeacher()) {
-      requests.push(api("/teacher/dashboard"), api("/teacher/groups"), api("/teacher/students"));
+      requests.push(
+        api("/teacher/dashboard"),
+        api("/teacher/groups"),
+        api("/teacher/students"),
+        api("/teacher/students?scope=all"),
+      );
     }
 
     if (isAdmin()) {
@@ -212,6 +231,7 @@ async function refreshData() {
       state.teacher.dashboard = results[index++] || null;
       state.teacher.groups = results[index++]?.groups || [];
       state.teacher.students = results[index++]?.students || [];
+      state.teacher.availableStudents = results[index++]?.students || [];
     }
 
     if (isAdmin()) {
@@ -252,7 +272,7 @@ function showLoadingStates() {
 }
 
 function normalizePath(pathname) {
-  return routes[pathname] ? pathname : "/dashboard";
+  return canUseRoute(pathname) ? pathname : "/dashboard";
 }
 
 function navigate(path, replace = false) {
@@ -281,6 +301,7 @@ function renderAll() {
   renderGroups();
   renderAssignments();
   renderSubmissions();
+  renderStudentGrades();
   renderTeacherTools();
   renderAdminTools();
   fillSelects();
@@ -292,6 +313,7 @@ function updateShellRoleOnly() {
   $$(".role-admin").forEach((element) => element.classList.toggle("hidden", !isAdmin()));
   $$(".role-teacher").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
   $$(".role-manage").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
+  $$(".role-student").forEach((element) => element.classList.toggle("hidden", !isStudent()));
 }
 
 function renderMetrics() {
@@ -360,11 +382,19 @@ function assignmentCards(assignments) {
         ` : ""}
       </article>
     `).join("")
-    : emptyState("No homework yet. Teachers can create assignments here.");
+    : emptyState(isStudent() ? "No homework assigned yet." : "No homework yet. Teachers can create assignments here.");
 }
 
 function renderAssignments() {
   setHtml("#assignmentsList", assignmentCards(state.assignments));
+}
+
+function renderStudentGrades() {
+  if (!isStudent()) return;
+
+  setHtml("#studentGradesList", state.submissions.length
+    ? fileCards(state.submissions)
+    : emptyState("Submitted homework and grades will appear here."));
 }
 
 function fileCards(submissions, grid = true, admin = false) {
@@ -495,6 +525,12 @@ function fillSelects() {
     .map((assignment) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(assignment.title)} - ${escapeHtml(assignment.id)}</option>`)
     .join("");
 
+  const studentOption = (student) => `
+    <option value="${escapeHtml(student.id)}">${escapeHtml(student.user_name)} - ${escapeHtml(student.email)}</option>
+  `;
+  const allStudentOptions = state.teacher.availableStudents.map(studentOption).join("");
+  const ownedStudentOptions = state.teacher.students.map(studentOption).join("");
+
   $$('select[name="group_id"]').forEach((select) => {
     const isTeacherStudentSelect = select.closest("#teacherStudentForm");
     if (isTeacherStudentSelect) {
@@ -506,6 +542,11 @@ function fillSelects() {
 
   $$('select[name="assignment_id"]').forEach((select) => {
     select.innerHTML = assignmentOptions || `<option value="">No homework available</option>`;
+  });
+
+  $$('select[data-student-select]').forEach((select) => {
+    const options = select.dataset.studentSelect === "owned" ? ownedStudentOptions : allStudentOptions;
+    select.innerHTML = options || `<option value="">No students available</option>`;
   });
 }
 
@@ -529,8 +570,9 @@ function bindNavigation() {
 function bindForms() {
   bindSubmit("#loginForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       const payload = await api("/login", { method: "POST", body: JSON.stringify(data) });
       setSession(payload.token, { email: data.email, user_id: payload.user_id, role: payload.role });
       showToast("Signed in");
@@ -541,11 +583,12 @@ function bindForms() {
 
   bindSubmit("#registerForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       const payload = await api("/registry", { method: "POST", body: JSON.stringify(data) });
       setSession(payload.token, { email: data.email, user_name: data.user_name, user_id: payload.user_id, role: "STUDENT" });
-      event.currentTarget.reset();
+      resetForm(form);
       showToast("Student account created");
     } catch (error) {
       showToast(error.message, "error");
@@ -554,11 +597,12 @@ function bindForms() {
 
   bindSubmit("#groupForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
-      data.is_private = isChecked(event.currentTarget, "is_private");
+      const data = readForm(form);
+      data.is_private = isChecked(form, "is_private");
       await api("/groups", { method: "POST", body: JSON.stringify(data) });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Group created");
     } catch (error) {
@@ -568,13 +612,14 @@ function bindForms() {
 
   bindSubmit("#addUserForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       await api(`/groups/${data.group_id}/users`, {
         method: "POST",
         body: JSON.stringify({ user_id: data.user_id }),
       });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Student added");
     } catch (error) {
@@ -584,10 +629,11 @@ function bindForms() {
 
   bindSubmit("#removeUserForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       await api(`/groups/${data.group_id}/users/${encodeURIComponent(data.user_id)}`, { method: "DELETE" });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Student removed");
     } catch (error) {
@@ -597,12 +643,13 @@ function bindForms() {
 
   bindSubmit("#assignmentForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       if (!data.due_date) delete data.due_date;
       data.group_id = Number(data.group_id);
       await api("/assignments", { method: "POST", body: JSON.stringify(data) });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Homework created");
     } catch (error) {
@@ -612,10 +659,11 @@ function bindForms() {
 
   bindSubmit("#uploadForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = new FormData(event.currentTarget);
+      const data = new FormData(form);
       await api("/submissions", { method: "POST", body: data });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("File uploaded to S3");
     } catch (error) {
@@ -625,13 +673,14 @@ function bindForms() {
 
   bindSubmit("#gradeForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       await api(`/submissions/${data.assignment_id}/${encodeURIComponent(data.student_id)}`, {
         method: "PUT",
         body: JSON.stringify({ grade: Number(data.grade), comment: data.comment || null }),
       });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Grade saved");
     } catch (error) {
@@ -641,8 +690,9 @@ function bindForms() {
 
   bindSubmit("#reportForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       await renderMissingReport(data.assignment_id);
     } catch (error) {
       showToast(error.message, "error");
@@ -651,8 +701,9 @@ function bindForms() {
 
   bindSubmit("#countForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       const payload = await api(`/students/${encodeURIComponent(data.student_id)}/submission-count`);
       setText("#countResult", `${payload.user_name}: ${payload.submission_count} uploaded file(s)`);
     } catch (error) {
@@ -662,11 +713,12 @@ function bindForms() {
 
   bindSubmit("#teacherStudentForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = compactPayload(readForm(event.currentTarget));
+      const data = compactPayload(readForm(form));
       if (data.group_id) data.group_id = Number(data.group_id);
       await api("/teacher/students", { method: "POST", body: JSON.stringify(data) });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("Student created");
     } catch (error) {
@@ -676,10 +728,11 @@ function bindForms() {
 
   bindSubmit("#adminCreateUserForm", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      const data = readForm(event.currentTarget);
+      const data = readForm(form);
       await api("/admin/users", { method: "POST", body: JSON.stringify(data) });
-      event.currentTarget.reset();
+      resetForm(form);
       await refreshData();
       showToast("User created");
     } catch (error) {

@@ -125,6 +125,10 @@ button {
   box-shadow: 0 16px 34px rgba(56, 189, 248, 0.22);
 }
 
+.brand-icon {
+  object-fit: cover;
+}
+
 .brand strong,
 .brand span,
 .session-card span,

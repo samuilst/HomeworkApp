@@ -29,6 +29,7 @@ def create_app(config = 'config.DevelopmentConfig'):
     app.config.from_object(config)
     frontend_folder = os.path.join(app.root_path, "frontend")
 
+    db.init_app(app)
     api = Api(app)
     migrate = Migrate(app, db)
 
@@ -56,7 +57,7 @@ def create_app(config = 'config.DevelopmentConfig'):
 
     @app.route("/<path:path>")
     def frontend_assets(path):
-        if path in {"dashboard", "files", "homework", "settings"}:
+        if path in {"dashboard", "files", "homework", "manage", "settings"}:
             return send_from_directory(frontend_folder, "index.html")
         return send_from_directory(frontend_folder, path)
 

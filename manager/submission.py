@@ -140,7 +140,6 @@ class SubmissionManager:
             current_user.role == UserRoleEnum.ADMIN
             or assignment.created_by == current_user.id
             or (not group.is_private and current_user.role == UserRoleEnum.TEACHER)
-            or current_user in group.members
         )
         if not allowed:
             raise PermissionError("Not allowed")

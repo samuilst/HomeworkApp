@@ -13,12 +13,14 @@ class S3Storage:
             raise RuntimeError("boto3 is required for S3 uploads. Install it with: pip install boto3") from exc
 
         region = config("AWS_REGION_NAME", default="eu-central-1")
-        return boto3.client(
-            "s3",
-            region_name=region,
-            aws_access_key_id=config("AWS_ACCESS_KEY_ID", default=None),
-            aws_secret_access_key=config("AWS_SECRET_ACCESS_KEY", default=None),
-        )
+        client_kwargs = {"region_name": region}
+        access_key = config("AWS_ACCESS_KEY_ID", default=None)
+        secret_key = config("AWS_SECRET_ACCESS_KEY", default=None)
+        if access_key and secret_key:
+            client_kwargs["aws_access_key_id"] = access_key
+            client_kwargs["aws_secret_access_key"] = secret_key
+
+        return boto3.client("s3", **client_kwargs)
 
     @staticmethod
     def bucket_name():
@@ -38,7 +40,7 @@ class S3Storage:
 
         file_storage.stream.seek(0)
         S3Storage._client().upload_fileobj(
-            file_storage,
+            file_storage.stream,
             bucket,
             key,
             ExtraArgs={"ContentType": file_storage.mimetype or "application/octet-stream"},
