@@ -30,6 +30,28 @@ class S3Storage:
         return bucket
 
     @staticmethod
+    def _storage_error_message(error):
+        try:
+            from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
+        except ImportError:
+            return str(error)
+
+        if isinstance(error, NoCredentialsError):
+            return "AWS credentials were not found. Check AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
+
+        if isinstance(error, PartialCredentialsError):
+            return "AWS credentials are incomplete. Check both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
+
+        if isinstance(error, ClientError):
+            response = error.response or {}
+            details = response.get("Error", {})
+            code = details.get("Code", "AWS error")
+            message = details.get("Message", str(error))
+            return f"S3 upload failed: {code} - {message}"
+
+        return f"S3 upload failed: {error}"
+
+    @staticmethod
     def upload(file_storage, prefix):
         filename = secure_filename(file_storage.filename or "")
         if not filename:
@@ -38,13 +60,17 @@ class S3Storage:
         bucket = S3Storage.bucket_name()
         key = f"{prefix.rstrip('/')}/{uuid.uuid4()}-{filename}"
 
-        file_storage.stream.seek(0)
-        S3Storage._client().upload_fileobj(
-            file_storage.stream,
-            bucket,
-            key,
-            ExtraArgs={"ContentType": file_storage.mimetype or "application/octet-stream"},
-        )
+        try:
+            file_storage.stream.seek(0)
+            S3Storage._client().upload_fileobj(
+                file_storage.stream,
+                bucket,
+                key,
+                ExtraArgs={"ContentType": file_storage.mimetype or "application/octet-stream"},
+            )
+        except Exception as exc:
+            raise RuntimeError(S3Storage._storage_error_message(exc)) from exc
+
         return f"s3://{bucket}/{key}"
 
     @staticmethod
@@ -57,4 +83,7 @@ class S3Storage:
         if not bucket or not key:
             return
 
-        S3Storage._client().delete_object(Bucket=bucket, Key=key)
+        try:
+            S3Storage._client().delete_object(Bucket=bucket, Key=key)
+        except Exception as exc:
+            raise RuntimeError(S3Storage._storage_error_message(exc)) from exc

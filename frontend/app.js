@@ -168,7 +168,7 @@ async function api(path, options = {}) {
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message = payload?.message || payload?.error || "Request failed";
+    const message = readableErrorText(payload, response);
     const details = payload?.errors ? ` ${JSON.stringify(payload.errors)}` : "";
     throw new Error(`${message}${details}`);
   }
@@ -187,6 +187,15 @@ function readForm(form) {
 
 function compactPayload(data) {
   return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== "" && value !== null));
+}
+
+function readableErrorText(payload, response) {
+  if (payload && typeof payload === "object") {
+    return payload.message || payload.error || JSON.stringify(payload);
+  }
+
+  const text = String(payload || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return text || response.statusText || `HTTP ${response.status}`;
 }
 
 async function refreshData() {
