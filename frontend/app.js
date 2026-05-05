@@ -916,7 +916,12 @@ async function handleActionClick(event) {
 }
 
 async function openSubmissionFile(path) {
-  const fileWindow = window.open("", "_blank", "noopener,noreferrer");
+  const fileWindow = window.open("about:blank", "_blank");
+  if (fileWindow) {
+    fileWindow.document.title = "Opening file";
+    fileWindow.document.body.innerHTML = "<p style=\"font-family: system-ui; padding: 24px;\">Opening file...</p>";
+  }
+
   const headers = new Headers();
   if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
 
