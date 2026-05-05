@@ -1,4 +1,4 @@
-from resources.user import UserRegistryResource, UserSignInResource
+from resources.user import UserRegisterResource, UserRegistryResource, UserSignInResource
 
 from resources.group import GroupListResource
 from resources.group import GroupAddUserResource
@@ -21,13 +21,14 @@ from resources.admin import AdminGroupsResource
 from resources.admin import AdminStatsResource
 from resources.admin import AdminSubmissionsResource
 from resources.admin import AdminUserDetailResource
+from resources.admin import AdminUserRoleResource
 from resources.admin import AdminUsersResource
 from resources.teacher import TeacherDashboardResource
 from resources.teacher import TeacherGroupsResource
 from resources.teacher import TeacherStudentsResource
 
 routes = (
-    (UserRegistryResource, "/registry"),
+    (UserRegistryResource, "/registry", "/register"),
     (UserSignInResource, "/login"),
 
     (GroupListResource, "/groups"),
@@ -51,6 +52,7 @@ routes = (
     (AdminStatsResource, "/admin/stats"),
     (AdminUsersResource, "/admin/users"),
     (AdminUserDetailResource, "/admin/users/<string:user_id>"),
+    (AdminUserRoleResource, "/admin/users/<string:user_id>/role"),
     (AdminGroupsResource, "/admin/groups"),
     (AdminAssignmentsResource, "/admin/assignments"),
     (AdminSubmissionsResource, "/admin/submissions"),

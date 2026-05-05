@@ -34,8 +34,9 @@
           <button class="nav-button active" data-route="/dashboard"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></button>
           <button class="nav-button" data-route="/files"><i data-lucide="folder-open"></i><span>Files</span></button>
           <button class="nav-button" data-route="/homework"><i data-lucide="clipboard-list"></i><span>Homework</span></button>
-          <button class="nav-button role-manage hidden" data-route="/manage"><i data-lucide="shield"></i><span>Manage</span></button>
-          <button class="nav-button role-teacher hidden" data-route="/settings"><i data-lucide="settings"></i><span>Settings</span></button>
+          <button class="nav-button role-nav teacher-nav hidden" data-route="/teacher"><i data-lucide="school"></i><span>Teacher</span></button>
+          <button class="nav-button role-nav admin-nav hidden" data-route="/admin"><i data-lucide="shield"></i><span>Admin</span></button>
+          <button class="nav-button" data-route="/settings"><i data-lucide="settings"></i><span>Settings</span></button>
         </nav>
 
         <div class="session-card">
@@ -80,10 +81,10 @@
             </form>
 
             <form id="registerForm" class="form-grid hidden">
-              <label>Username<input name="user_name" maxlength="10" autocomplete="username" required /></label>
+              <label>Username<input name="user_name" minlength="2" maxlength="50" autocomplete="username" required /></label>
               <label>Email<input name="email" type="email" autocomplete="email" required /></label>
-              <label>Password<input name="password" type="password" autocomplete="new-password" required /></label>
-              <div class="notice"><i data-lucide="shield-check"></i><span>Public registration creates a Student account only.</span></div>
+              <label>Password<input name="password" type="password" autocomplete="new-password" minlength="10" pattern="(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{10,}" title="Use at least 10 characters with an uppercase letter, a number, and a special character." required /></label>
+              <div class="notice"><i data-lucide="shield-check"></i><span>Student account only. Password needs 10+ chars, uppercase, number, and symbol.</span></div>
               <button class="primary-button full" type="submit"><i data-lucide="user-plus"></i><span>Create student account</span></button>
             </form>
           </div>
@@ -116,7 +117,7 @@
                 <div class="panel-head"><h2>File grid</h2><i data-lucide="folder-open"></i></div>
                 <div class="file-grid" id="submissionsList"></div>
               </section>
-              <section class="panel glass">
+              <section class="panel glass student-only">
                 <div class="panel-head"><h2>Upload solution</h2><i data-lucide="cloud-upload"></i></div>
                 <form id="uploadForm" class="form-grid" enctype="multipart/form-data">
                   <label>Homework<select name="assignment_id" required></select></label>
@@ -158,12 +159,7 @@
                 <div class="homework-board" id="assignmentsList"></div>
               </section>
 
-              <section class="panel glass role-student hidden span-2">
-                <div class="panel-head"><h2>My grades</h2><i data-lucide="badge-check"></i></div>
-                <div class="file-grid" id="studentGradesList"></div>
-              </section>
-
-              <section class="panel glass role-teacher hidden">
+              <section class="panel glass teacher-only">
                 <div class="panel-head"><h2>Create homework</h2><i data-lucide="square-pen"></i></div>
                 <form id="assignmentForm" class="form-grid">
                   <label>Group<select name="group_id" required></select></label>
@@ -174,7 +170,7 @@
                 </form>
               </section>
 
-              <section class="panel glass role-teacher hidden">
+              <section class="panel glass teacher-only">
                 <div class="panel-head"><h2>Grade and reports</h2><i data-lucide="badge-check"></i></div>
                 <form id="gradeForm" class="form-grid">
                   <label>Homework<select name="assignment_id" required></select></label>
@@ -297,6 +293,62 @@ AWS_S3_BUCKET_NAME=your-bucket-name</pre>
                   <button class="secondary-button" type="submit"><i data-lucide="calculator"></i><span>Count uploads</span></button>
                 </form>
                 <div class="result-box" id="countResult">No student selected.</div>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="teacherView">
+            <div class="metric-grid">
+              <div class="metric glass"><span>My groups</span><strong id="teacherGroupCount">0</strong><i data-lucide="users"></i></div>
+              <div class="metric glass"><span>Students</span><strong id="teacherStudentCount">0</strong><i data-lucide="graduation-cap"></i></div>
+              <div class="metric glass"><span>Assignments</span><strong id="teacherAssignmentCount">0</strong><i data-lucide="clipboard-list"></i></div>
+              <div class="metric glass"><span>Ungraded</span><strong id="teacherUngradedCount">0</strong><i data-lucide="badge-alert"></i></div>
+            </div>
+            <div class="split-layout">
+              <section class="panel glass">
+                <div class="panel-head"><h2>Teacher students</h2><i data-lucide="graduation-cap"></i></div>
+                <div class="item-list" id="teacherStudentsList"></div>
+              </section>
+              <section class="panel glass">
+                <div class="panel-head"><h2>Create student</h2><i data-lucide="user-plus"></i></div>
+                <form id="teacherCreateStudentForm" class="form-grid">
+                  <label>Username<input name="user_name" minlength="2" maxlength="50" required /></label>
+                  <label>Email<input name="email" type="email" required /></label>
+                  <label>Password<input name="password" type="password" minlength="10" pattern="(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{10,}" title="Use at least 10 characters with an uppercase letter, a number, and a special character." required /></label>
+                  <label>Optional group<select name="group_id"></select></label>
+                  <button class="primary-button" type="submit"><i data-lucide="plus"></i><span>Create student</span></button>
+                </form>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="adminView">
+            <div class="metric-grid">
+              <div class="metric glass"><span>Users</span><strong id="adminUserCount">0</strong><i data-lucide="users"></i></div>
+              <div class="metric glass"><span>Teachers</span><strong id="adminTeacherCount">0</strong><i data-lucide="school"></i></div>
+              <div class="metric glass"><span>Students</span><strong id="adminStudentCount">0</strong><i data-lucide="graduation-cap"></i></div>
+              <div class="metric glass"><span>Submissions</span><strong id="adminSubmissionCount">0</strong><i data-lucide="files"></i></div>
+            </div>
+            <div class="split-layout wide-left">
+              <section class="panel glass">
+                <div class="panel-head"><h2>User administration</h2><i data-lucide="shield"></i></div>
+                <div class="admin-table" id="adminUsersList"></div>
+              </section>
+              <section class="panel glass">
+                <div class="panel-head"><h2>Create privileged user</h2><i data-lucide="user-cog"></i></div>
+                <form id="adminCreateUserForm" class="form-grid">
+                  <label>Username<input name="user_name" maxlength="50" required /></label>
+                  <label>Email<input name="email" type="email" required /></label>
+                  <label>Password<input name="password" type="password" minlength="10" pattern="(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{10,}" title="Use at least 10 characters with an uppercase letter, a number, and a special character." required /></label>
+                  <label>Role
+                    <select name="role" required>
+                      <option value="STUDENT">STUDENT</option>
+                      <option value="TEACHER">TEACHER</option>
+                      <option value="ADMIN">ADMIN</option>
+                    </select>
+                  </label>
+                  <button class="primary-button" type="submit"><i data-lucide="user-plus"></i><span>Create user</span></button>
+                </form>
               </section>
             </div>
           </section>

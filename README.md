@@ -138,11 +138,27 @@ Frontend routes:
 /dashboard
 /files
 /homework
-/manage
+/teacher
+/admin
 /settings
 ```
 
-API routes:
+Main pages in the dashboard:
+
+- Login and registration
+- Dashboard overview
+- Files grid and S3 upload
+- Homework, groups, grading, and missing submission reports
+- Teacher tools for users with `TEACHER` or `ADMIN` role
+- Admin tools for users with `ADMIN` role
+- Settings and S3 configuration helper
+
+The `/teacher` tab is visible only after logging in as `TEACHER` or `ADMIN`.
+The `/admin` tab is visible only after logging in as `ADMIN`.
+
+## Main API Endpoints
+
+### Auth
 
 ```text
 POST /registry
@@ -180,13 +196,61 @@ GET    /admin/users
 POST   /admin/users
 GET    /admin/users/<user_id>
 PUT    /admin/users/<user_id>
+PATCH  /admin/users/<user_id>/role
 DELETE /admin/users/<user_id>
 GET    /admin/groups
 GET    /admin/assignments
 GET    /admin/submissions
 ```
 
-## Roles
+Admin users can:
+
+- View platform statistics
+- List all users
+- Create users with `STUDENT`, `TEACHER`, or `ADMIN` role
+- Update user profile data and role
+- Change only a user's role through `PATCH /admin/users/<user_id>/role`
+- Delete users
+- View all groups, assignments, and submissions
+
+Example create teacher:
+
+```powershell
+curl -X POST http://localhost:5000/admin/users `
+  -H "Authorization: Bearer ADMIN_TOKEN" `
+  -H "Content-Type: application/json" `
+  -d "{\"user_name\":\"teacher1\",\"email\":\"teacher1@test.com\",\"password\":\"Mypass123!\",\"role\":\"TEACHER\"}"
+```
+
+### Teacher
+
+Users with role `TEACHER` or `ADMIN` can access these endpoints.
+
+```text
+GET  /teacher/dashboard
+GET  /teacher/groups
+GET  /teacher/students
+POST /teacher/students
+```
+
+Teachers can:
+
+- View a dashboard for their own groups
+- List groups they own
+- List students from their groups
+- Create student accounts
+- Optionally add a newly created student to one of their groups
+
+Example create student and add to group:
+
+```powershell
+curl -X POST http://localhost:5000/teacher/students `
+  -H "Authorization: Bearer TEACHER_TOKEN" `
+  -H "Content-Type: application/json" `
+  -d "{\"user_name\":\"student1\",\"email\":\"student1@test.com\",\"password\":\"Mypass123!\",\"group_id\":1}"
+```
+
+## Upload Homework
 
 Admin:
 

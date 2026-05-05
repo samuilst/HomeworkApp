@@ -18,5 +18,12 @@ class AdminUserUpdateSchema(Schema):
     role = fields.String(validate=validate.OneOf([role.value for role in UserRoleEnum]))
 
 
+class AdminUserRoleUpdateSchema(Schema):
+    role = fields.String(
+        required=True,
+        validate=validate.OneOf([role.value for role in UserRoleEnum]),
+    )
+
+
 class TeacherStudentCreateSchema(PasswordValidationMixin, BaseUserSchema):
     group_id = fields.Integer(required=False, allow_none=True)

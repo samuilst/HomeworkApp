@@ -562,7 +562,8 @@ option {
 }
 
 .item-list,
-.homework-board {
+.homework-board,
+.admin-table {
   display: grid;
   gap: 12px;
 }
@@ -623,6 +624,35 @@ option {
 
 .file-card {
   min-height: 170px;
+}
+
+.admin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, auto);
+  gap: 12px;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.admin-row strong,
+.admin-row small {
+  display: block;
+}
+
+.admin-row small {
+  margin-top: 4px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.role-form {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .file-icon {
@@ -813,7 +843,7 @@ option {
   }
 
   .nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .session-card {
@@ -868,7 +898,9 @@ option {
 
   .config-grid,
   .file-grid,
-  .homework-board {
+  .homework-board,
+  .admin-row,
+  .role-form {
     grid-template-columns: 1fr;
   }
 }

@@ -24,9 +24,9 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_DATABASE_URI = (
         f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
 
-def create_app(config = 'config.DevelopmentConfig'):
+def create_app(config_class = 'config.DevelopmentConfig'):
     app = Flask(__name__, static_folder=None)
-    app.config.from_object(config)
+    app.config.from_object(config_class)
     frontend_folder = os.path.join(app.root_path, "frontend")
 
     db.init_app(app)
@@ -49,7 +49,8 @@ def create_app(config = 'config.DevelopmentConfig'):
     def handle_runtime_error(error):
         return {"message": str(error)}, 500
 
-    [api.add_resource(*route) for route in routes]
+    for route in routes:
+        api.add_resource(*route)
 
     @app.route("/")
     def frontend_index():
@@ -57,7 +58,7 @@ def create_app(config = 'config.DevelopmentConfig'):
 
     @app.route("/<path:path>")
     def frontend_assets(path):
-        if path in {"dashboard", "files", "homework", "manage", "settings"}:
+        if path in {"dashboard", "files", "homework", "settings", "admin", "teacher"}:
             return send_from_directory(frontend_folder, "index.html")
         return send_from_directory(frontend_folder, path)
 

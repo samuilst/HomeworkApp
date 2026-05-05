@@ -4,8 +4,10 @@ const state = {
   groups: [],
   assignments: [],
   submissions: [],
-  teacher: { dashboard: null, groups: [], students: [], availableStudents: [] },
-  admin: { stats: null, users: [], groups: [], assignments: [], submissions: [], roleFilter: "" },
+  adminStats: null,
+  adminUsers: [],
+  teacherStats: null,
+  teacherStudents: [],
   loading: false,
 };
 
@@ -53,8 +55,9 @@ const routes = {
   "/dashboard": { view: "dashboardView", title: "Dashboard" },
   "/files": { view: "filesView", title: "Files" },
   "/homework": { view: "homeworkView", title: "Homework" },
-  "/manage": { view: "manageView", title: "Manage", teacherOnly: true },
-  "/settings": { view: "settingsView", title: "Settings", teacherOnly: true },
+  "/teacher": { view: "teacherView", title: "Teacher" },
+  "/admin": { view: "adminView", title: "Admin" },
+  "/settings": { view: "settingsView", title: "Settings" },
 };
 
 function escapeHtml(value) {
@@ -104,7 +107,8 @@ function canUseRoute(path) {
 function setLoading(isLoading) {
   state.loading = isLoading;
   $$("button").forEach((button) => {
-    if (button.id !== "logoutButton") button.disabled = isLoading;
+    const keepEnabled = button.id === "logoutButton" || button.classList.contains("nav-button") || button.classList.contains("tab");
+    if (!keepEnabled) button.disabled = isLoading;
   });
   setText("#lastStatus", isLoading ? "Syncing" : "Ready");
 }
@@ -117,37 +121,79 @@ function setSession(token, user) {
   updateShell();
 }
 
+function authUserFromPayload(payload, fallback = {}) {
+  const user = payload.user || {};
+  return {
+    user_id: user.user_id || payload.user_id,
+    user_name: user.user_name || payload.user_name || fallback.user_name || "",
+    email: user.email || payload.email || fallback.email || "",
+    role: user.role || payload.role || fallback.role || "STUDENT",
+  };
+}
+
 function clearSession() {
   state.token = null;
   state.user = null;
   state.groups = [];
   state.assignments = [];
   state.submissions = [];
-  state.teacher = { dashboard: null, groups: [], students: [], availableStudents: [] };
-  state.admin = { stats: null, users: [], groups: [], assignments: [], submissions: [], roleFilter: "" };
+  state.adminStats = null;
+  state.adminUsers = [];
+  state.teacherStats = null;
+  state.teacherStudents = [];
   localStorage.removeItem("classhub_token");
   localStorage.removeItem("classhub_user");
   updateShell();
   navigate("/dashboard", true);
 }
 
+function expireSession() {
+  state.token = null;
+  state.user = null;
+  state.groups = [];
+  state.assignments = [];
+  state.submissions = [];
+  state.adminStats = null;
+  state.adminUsers = [];
+  state.teacherStats = null;
+  state.teacherStudents = [];
+  localStorage.removeItem("classhub_token");
+  localStorage.removeItem("classhub_user");
+  $("#authPanel").classList.remove("hidden");
+  $("#appContent").classList.add("hidden");
+  $("#sessionName").textContent = "Guest";
+  $("#sessionRole").textContent = "Not signed in";
+  $("#avatar").textContent = "?";
+  updateRoleNavigation();
+  updateRoleSections();
+  navigate("/dashboard", true);
+}
+
 function updateShell() {
   const isLogged = Boolean(state.token);
-  toggleHidden("#authPanel", isLogged);
-  toggleHidden("#appContent", !isLogged);
-  setText("#sessionName", state.user?.email || state.user?.user_name || "Guest");
-  setText("#sessionRole", state.user?.role || "Not signed in");
-  setText("#avatar", (state.user?.email || state.user?.user_name || "?").slice(0, 1).toUpperCase());
-  const logoutButton = $("#logoutButton");
-  if (logoutButton) logoutButton.style.visibility = isLogged ? "visible" : "hidden";
-
-  $$(".role-admin").forEach((element) => element.classList.toggle("hidden", !isAdmin()));
-  $$(".role-teacher").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
-  $$(".role-manage").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
-  $$(".role-student").forEach((element) => element.classList.toggle("hidden", !isStudent()));
-
+  $("#authPanel").classList.toggle("hidden", isLogged);
+  $("#appContent").classList.toggle("hidden", !isLogged);
+  $("#sessionName").textContent = state.user?.email || state.user?.user_name || "Guest";
+  $("#sessionRole").textContent = state.user?.role || "Not signed in";
+  $("#avatar").textContent = (state.user?.email || state.user?.user_name || "?").slice(0, 1).toUpperCase();
+  $("#logoutButton").style.visibility = isLogged ? "visible" : "hidden";
+  updateRoleNavigation();
+  updateRoleSections();
   if (isLogged) refreshData();
   if (window.lucide) window.lucide.createIcons();
+}
+
+function updateRoleNavigation() {
+  const role = state.user?.role;
+  $$(".teacher-nav").forEach((item) => item.classList.toggle("hidden", !["TEACHER", "ADMIN"].includes(role)));
+  $$(".admin-nav").forEach((item) => item.classList.toggle("hidden", role !== "ADMIN"));
+}
+
+function updateRoleSections() {
+  const role = state.user?.role;
+  $$(".student-only").forEach((item) => item.classList.toggle("hidden", role !== "STUDENT"));
+  $$(".teacher-only").forEach((item) => item.classList.toggle("hidden", !["TEACHER", "ADMIN"].includes(role)));
+  $$(".admin-only").forEach((item) => item.classList.toggle("hidden", role !== "ADMIN"));
 }
 
 async function api(path, options = {}) {
@@ -168,12 +214,23 @@ async function api(path, options = {}) {
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message = readableErrorText(payload, response);
-    const details = payload?.errors ? ` ${JSON.stringify(payload.errors)}` : "";
+    if (response.status === 401) {
+      expireSession();
+      throw new Error("Your session expired. Please sign in again.");
+    }
+    const message = payload?.message || payload?.error || `Request failed (${response.status})`;
+    const details = payload?.errors ? ` ${formatErrors(payload.errors)}` : "";
     throw new Error(`${message}${details}`);
   }
 
   return payload;
+}
+
+function formatErrors(errors) {
+  if (typeof errors === "string") return errors;
+  return Object.entries(errors)
+    .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(", ") : messages}`)
+    .join("; ");
 }
 
 function readForm(form) {
@@ -208,55 +265,37 @@ async function refreshData() {
       api("/groups"),
       api("/assignments"),
       api("/submissions"),
-    ];
-
-    if (isTeacher()) {
-      requests.push(
-        api("/teacher/dashboard"),
-        api("/teacher/groups"),
-        api("/teacher/students"),
-        api("/teacher/students?scope=all"),
-      );
-    }
-
-    if (isAdmin()) {
-      const roleParam = state.admin.roleFilter ? `?role=${encodeURIComponent(state.admin.roleFilter)}` : "";
-      requests.push(
-        api("/admin/stats"),
-        api(`/admin/users${roleParam}`),
-        api("/admin/groups"),
-        api("/admin/assignments"),
-        api("/admin/submissions"),
-      );
-    }
-
-    const results = await Promise.all(requests);
-    state.groups = results[0].groups || [];
-    state.assignments = results[1].assignments || [];
-    state.submissions = results[2].submissions || [];
-
-    let index = 3;
-    if (isTeacher()) {
-      state.teacher.dashboard = results[index++] || null;
-      state.teacher.groups = results[index++]?.groups || [];
-      state.teacher.students = results[index++]?.students || [];
-      state.teacher.availableStudents = results[index++]?.students || [];
-    }
-
-    if (isAdmin()) {
-      state.admin.stats = results[index++] || null;
-      state.admin.users = results[index++]?.users || [];
-      state.admin.groups = results[index++]?.groups || [];
-      state.admin.assignments = results[index++]?.assignments || [];
-      state.admin.submissions = results[index++]?.submissions || [];
-    }
-
+    ]);
+    state.groups = groupsData.groups || [];
+    state.assignments = assignmentsData.assignments || [];
+    state.submissions = submissionsData.submissions || [];
+    await refreshRoleData();
     renderAll();
   } catch (error) {
     setText("#lastStatus", "Error");
     showToast(error.message, "error");
   } finally {
     setLoading(false);
+  }
+}
+
+async function refreshRoleData() {
+  if (["TEACHER", "ADMIN"].includes(state.user?.role)) {
+    const [teacherStats, teacherStudents] = await Promise.all([
+      api("/teacher/dashboard"),
+      api("/teacher/students"),
+    ]);
+    state.teacherStats = teacherStats;
+    state.teacherStudents = teacherStudents.students || [];
+  }
+
+  if (state.user?.role === "ADMIN") {
+    const [adminStats, adminUsers] = await Promise.all([
+      api("/admin/stats"),
+      api("/admin/users"),
+    ]);
+    state.adminStats = adminStats;
+    state.adminUsers = adminUsers.users || [];
   }
 }
 
@@ -281,7 +320,9 @@ function showLoadingStates() {
 }
 
 function normalizePath(pathname) {
-  return canUseRoute(pathname) ? pathname : "/dashboard";
+  if (pathname === "/admin" && state.user?.role !== "ADMIN") return "/dashboard";
+  if (pathname === "/teacher" && !["TEACHER", "ADMIN"].includes(state.user?.role)) return "/dashboard";
+  return routes[pathname] ? pathname : "/dashboard";
 }
 
 function navigate(path, replace = false) {
@@ -310,19 +351,62 @@ function renderAll() {
   renderGroups();
   renderAssignments();
   renderSubmissions();
-  renderStudentGrades();
-  renderTeacherTools();
-  renderAdminTools();
+  renderTeacher();
+  renderAdmin();
   fillSelects();
   updateShellRoleOnly();
   if (window.lucide) window.lucide.createIcons();
 }
 
-function updateShellRoleOnly() {
-  $$(".role-admin").forEach((element) => element.classList.toggle("hidden", !isAdmin()));
-  $$(".role-teacher").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
-  $$(".role-manage").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
-  $$(".role-student").forEach((element) => element.classList.toggle("hidden", !isStudent()));
+function renderTeacher() {
+  const stats = state.teacherStats || {};
+  $("#teacherGroupCount").textContent = stats.groups ?? 0;
+  $("#teacherStudentCount").textContent = stats.students ?? 0;
+  $("#teacherAssignmentCount").textContent = stats.assignments ?? 0;
+  $("#teacherUngradedCount").textContent = stats.ungraded_submissions ?? 0;
+
+  $("#teacherStudentsList").innerHTML = state.teacherStudents.length
+    ? state.teacherStudents.map((student) => `
+      <article class="item-card">
+        <strong>${escapeHtml(student.user_name)}</strong>
+        <small>${escapeHtml(student.email)}</small>
+        <div class="pill-row">
+          <span class="pill blue">ID ${escapeHtml(student.id)}</span>
+          <span class="pill green">${escapeHtml(student.role)}</span>
+        </div>
+      </article>
+    `).join("")
+    : emptyState("No students in your groups yet.");
+}
+
+function renderAdmin() {
+  const stats = state.adminStats || {};
+  $("#adminUserCount").textContent = stats.users ?? 0;
+  $("#adminTeacherCount").textContent = stats.teachers ?? 0;
+  $("#adminStudentCount").textContent = stats.students ?? 0;
+  $("#adminSubmissionCount").textContent = stats.submissions ?? 0;
+
+  $("#adminUsersList").innerHTML = state.adminUsers.length
+    ? state.adminUsers.map((user) => `
+      <article class="admin-row">
+        <div>
+          <strong>${escapeHtml(user.user_name)}</strong>
+          <small>${escapeHtml(user.email)}</small>
+          <small>ID ${escapeHtml(user.id)}</small>
+        </div>
+        <form class="role-form" data-user-id="${escapeHtml(user.id)}">
+          <select name="role" aria-label="Role for ${escapeHtml(user.user_name)}">
+            <option value="STUDENT" ${user.role === "STUDENT" ? "selected" : ""}>STUDENT</option>
+            <option value="TEACHER" ${user.role === "TEACHER" ? "selected" : ""}>TEACHER</option>
+            <option value="ADMIN" ${user.role === "ADMIN" ? "selected" : ""}>ADMIN</option>
+          </select>
+          <button class="secondary-button" type="submit"><i data-lucide="save"></i><span>Save role</span></button>
+        </form>
+      </article>
+    `).join("")
+    : emptyState("No users found.");
+
+  bindRoleForms();
 }
 
 function renderMetrics() {
@@ -412,7 +496,7 @@ function fileCards(submissions, grid = true, admin = false) {
       <article class="${grid ? "file-card" : "item-card"}">
         ${grid ? `<div class="file-icon"><i data-lucide="file-text"></i></div>` : ""}
         <strong>${escapeHtml(submission.assignment_title || "Submission")}</strong>
-        <small>${escapeHtml(submission.student_name || submission.student_id)} - ${submission.submitted_at ? new Date(submission.submitted_at).toLocaleString("en-GB") : "No time"}</small>
+        <small>${escapeHtml(submission.student_name || submission.student_id)} &middot; ${submission.submitted_at ? new Date(submission.submitted_at).toLocaleString("en-GB") : "No time"}</small>
         <small>${escapeHtml(submission.file_path)}</small>
         <div class="pill-row">
           <span class="pill blue">Student ${escapeHtml(submission.student_id)}</span>
@@ -530,15 +614,11 @@ function emptyState(message) {
 
 function fillSelects() {
   const groupOptions = state.groups
-    .map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)} - ${escapeHtml(group.id)}</option>`)
-    .join("");
-
-  const teacherGroupOptions = state.teacher.groups
-    .map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)} - ${escapeHtml(group.id)}</option>`)
+    .map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)} &middot; ${escapeHtml(group.id)}</option>`)
     .join("");
 
   const assignmentOptions = state.assignments
-    .map((assignment) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(assignment.title)} - ${escapeHtml(assignment.id)}</option>`)
+    .map((assignment) => `<option value="${escapeHtml(assignment.id)}">${escapeHtml(assignment.title)} &middot; ${escapeHtml(assignment.id)}</option>`)
     .join("");
 
   const studentOption = (student) => `
@@ -560,9 +640,38 @@ function fillSelects() {
     select.innerHTML = assignmentOptions || `<option value="">No homework available</option>`;
   });
 
-  $$('select[data-student-select]').forEach((select) => {
-    const options = select.dataset.studentSelect === "owned" ? ownedStudentOptions : allStudentOptions;
-    select.innerHTML = options || `<option value="">No students available</option>`;
+  $$('#teacherCreateStudentForm select[name="group_id"]').forEach((select) => {
+    select.innerHTML = groupOptions || `<option value="">Create a group first</option>`;
+    select.disabled = !groupOptions;
+  });
+}
+
+function bindRoleForms() {
+  $$(".role-form").forEach((form) => {
+    if (form.dataset.bound === "true") return;
+    form.dataset.bound = "true";
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const userId = event.currentTarget.dataset.userId;
+        const role = event.currentTarget.elements.role.value;
+        await api(`/admin/users/${encodeURIComponent(userId)}/role`, {
+          method: "PATCH",
+          body: JSON.stringify({ role }),
+        });
+        if (state.user?.user_id === userId) {
+          state.user.role = role;
+          localStorage.setItem("classhub_user", JSON.stringify(state.user));
+          updateRoleNavigation();
+          updateRoleSections();
+          navigate(normalizePath(location.pathname), true);
+        }
+        await refreshData();
+        showToast("User role updated");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
   });
 }
 
@@ -590,7 +699,7 @@ function bindForms() {
     try {
       const data = readForm(form);
       const payload = await api("/login", { method: "POST", body: JSON.stringify(data) });
-      setSession(payload.token, { email: data.email, user_id: payload.user_id, role: payload.role });
+      setSession(payload.token, authUserFromPayload(payload, { email: data.email }));
       showToast("Signed in");
     } catch (error) {
       showToast(error.message, "error");
@@ -601,10 +710,10 @@ function bindForms() {
     event.preventDefault();
     const form = event.currentTarget;
     try {
-      const data = readForm(form);
-      const payload = await api("/registry", { method: "POST", body: JSON.stringify(data) });
-      setSession(payload.token, { email: data.email, user_name: data.user_name, user_id: payload.user_id, role: "STUDENT" });
-      resetForm(form);
+      const data = readForm(event.currentTarget);
+      const payload = await api("/register", { method: "POST", body: JSON.stringify(data) });
+      setSession(payload.token, authUserFromPayload(payload, { email: data.email, user_name: data.user_name, role: "STUDENT" }));
+      event.currentTarget.reset();
       showToast("Student account created");
     } catch (error) {
       showToast(error.message, "error");
@@ -756,191 +865,37 @@ function bindForms() {
     }
   });
 
-  $("#refreshButton")?.addEventListener("click", refreshData);
-  $("#logoutButton")?.addEventListener("click", clearSession);
-
-  document.addEventListener("click", handleActionClick);
-  document.addEventListener("submit", handleInlineSubmit);
-}
-
-async function handleInlineSubmit(event) {
-  const form = event.target;
-  if (!(form instanceof HTMLFormElement)) return;
-
-  const userId = form.dataset.editUser;
-  const groupId = form.dataset.editGroup;
-  const assignmentId = form.dataset.editAssignment;
-  const gradeAssignmentId = form.dataset.gradeSubmission;
-
-  if (!userId && !groupId && !assignmentId && !gradeAssignmentId) return;
-
-  event.preventDefault();
-
-  try {
-    if (userId) {
-      const data = compactPayload(readForm(form));
-      await api(`/admin/users/${encodeURIComponent(userId)}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
-      await refreshData();
-      showToast("User saved");
-      return;
-    }
-
-    if (groupId) {
-      const data = readForm(form);
-      await api(`/groups/${groupId}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          name: data.name,
-          is_private: isChecked(form, "is_private"),
-        }),
-      });
-      await refreshData();
-      showToast("Group saved");
-      return;
-    }
-
-    if (assignmentId) {
-      const data = compactPayload(readForm(form));
-      await api(`/assignments/${assignmentId}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
-      await refreshData();
-      showToast("Homework saved");
-      return;
-    }
-
-    if (gradeAssignmentId) {
-      const data = readForm(form);
-      await api(`/submissions/${gradeAssignmentId}/${encodeURIComponent(form.dataset.studentId)}`, {
-        method: "PUT",
-        body: JSON.stringify({ grade: Number(data.grade), comment: data.comment || null }),
-      });
-      await refreshData();
-      showToast("Grade saved");
-    }
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
-async function renderMissingReport(assignmentId) {
-  const payload = await api(`/assignments/${assignmentId}/missing-submissions`);
-  setHtml("#missingList", payload.missing_students?.length
-    ? payload.missing_students.map((student) => `
-      <article class="item-card">
-        <strong>${escapeHtml(student.user_name)}</strong>
-        <small>${escapeHtml(student.email)}</small>
-        <span class="pill coral">ID ${escapeHtml(student.id)}</span>
-      </article>
-    `).join("")
-    : emptyState("Everyone submitted this homework."));
-  showToast(`Missing submissions: ${payload.missing_count}`);
-}
-
-async function handleActionClick(event) {
-  const button = event.target?.closest?.("button");
-  if (!button || state.loading) return;
-
-  try {
-    if (button.dataset.openFile) {
-      await openSubmissionFile(button.dataset.openFile);
-    }
-
-    if (button.dataset.roleFilter !== undefined) {
-      state.admin.roleFilter = button.dataset.roleFilter;
-      await refreshData();
-      showToast(state.admin.roleFilter ? `Filtered ${state.admin.roleFilter.toLowerCase()} users` : "Showing all users");
-    }
-
-    if (button.dataset.setRole) {
-      await api(`/admin/users/${encodeURIComponent(button.dataset.setRole)}`, {
-        method: "PUT",
-        body: JSON.stringify({ role: button.dataset.role }),
-      });
-      await refreshData();
-      showToast("Role updated");
-    }
-
-    if (button.dataset.deleteUser) {
-      await api(`/admin/users/${encodeURIComponent(button.dataset.deleteUser)}`, { method: "DELETE" });
-      await refreshData();
-      showToast("User deleted");
-    }
-
-    if (button.dataset.deleteGroup) {
-      await api(`/groups/${button.dataset.deleteGroup}`, { method: "DELETE" });
-      await refreshData();
-      showToast("Group deleted");
-    }
-
-    if (button.dataset.missingAssignment) {
-      const form = $("#reportForm");
-      setFormField(form, "assignment_id", button.dataset.missingAssignment);
-      navigate("/homework");
-      await renderMissingReport(button.dataset.missingAssignment);
-    }
-
-    if (button.dataset.deleteAssignment) {
-      await api(`/assignments/${button.dataset.deleteAssignment}`, { method: "DELETE" });
-      await refreshData();
-      showToast("Homework deleted");
-    }
-
-    if (button.dataset.fillGrade) {
-      const form = $("#gradeForm");
-      if (form) {
-        setFormField(form, "assignment_id", button.dataset.fillGrade);
-        setFormField(form, "student_id", button.dataset.studentId || "");
+  $("#teacherCreateStudentForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const data = readForm(event.currentTarget);
+      if (!data.group_id) {
+        throw new Error("Create a group first, then create the student inside that group.");
       }
-      navigate("/homework");
-    }
-
-    if (button.dataset.deleteSubmission) {
-      await api("/submissions", {
-        method: "DELETE",
-        body: JSON.stringify({
-          assignment_id: Number(button.dataset.deleteSubmission),
-          student_id: button.dataset.studentId,
-        }),
-      });
+      await api("/teacher/students", { method: "POST", body: JSON.stringify(data) });
+      event.currentTarget.reset();
       await refreshData();
-      showToast("Submission deleted");
+      showToast("Student created");
+    } catch (error) {
+      showToast(error.message, "error");
     }
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
+  });
 
-async function openSubmissionFile(path) {
-  const fileWindow = window.open("about:blank", "_blank");
-  if (fileWindow) {
-    fileWindow.document.title = "Opening file";
-    fileWindow.document.body.innerHTML = "<p style=\"font-family: system-ui; padding: 24px;\">Opening file...</p>";
-  }
+  $("#adminCreateUserForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const data = readForm(event.currentTarget);
+      await api("/admin/users", { method: "POST", body: JSON.stringify(data) });
+      event.currentTarget.reset();
+      await refreshData();
+      showToast("User created");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
 
-  const headers = new Headers();
-  if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
-
-  const response = await fetch(path, { headers });
-  if (!response.ok) {
-    if (fileWindow) fileWindow.close();
-    const contentType = response.headers.get("content-type") || "";
-    const payload = contentType.includes("application/json") ? await response.json() : await response.text();
-    throw new Error(readableErrorText(payload, response));
-  }
-
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  if (fileWindow) {
-    fileWindow.location.href = url;
-  } else {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  $("#refreshButton").addEventListener("click", refreshData);
+  $("#logoutButton").addEventListener("click", clearSession);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

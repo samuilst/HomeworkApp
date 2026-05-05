@@ -11,6 +11,15 @@ from models.user import UserModel
 from schemas.request.auth import UserRegisterSchema, UserSignInSchema
 
 
+def serialize_auth_user(user):
+    return {
+        "user_id": user.id,
+        "user_name": user.user_name,
+        "email": user.email,
+        "role": user.role.value,
+    }
+
+
 class UserRegistryResource(Resource):
     @validate_schema(UserRegisterSchema())
     def post(self):
@@ -39,10 +48,18 @@ class UserRegistryResource(Resource):
 
         return {
             "token": token,
+            "user": serialize_auth_user(user),
             "message": "User registered successfully!",
-            "user_id": user.id
+            "user_id": user.id,
+            "user_name": user.user_name,
+            "email": user.email,
+            "role": user.role.value,
 
         }, 201
+
+
+class UserRegisterResource(UserRegistryResource):
+    pass
 
 
 class UserSignInResource(Resource):
@@ -57,13 +74,16 @@ class UserSignInResource(Resource):
 
         user = UserModel.query.filter_by(email=data['email']).first()
 
-        if not user or not check_password_hash(user.password, data['password']):
-            return {'message': 'Invalid email or password'}, 400
+        if not user or not check_password_hash((user.password), data['password']):
+            return {'message': 'Invalid email or password'}, 401
 
         return {
-            "message": "User login successfully!",
+            "message": "User logged in successfully!",
             "token": AuthManager.encode_token(user),
+            "user": serialize_auth_user(user),
             "user_id": user.id,
+            "user_name": user.user_name,
+            "email": user.email,
             'role': user.role.value
         }, 200
 
