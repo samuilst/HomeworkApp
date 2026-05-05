@@ -46,6 +46,10 @@ class AuthManager:
         except Exception:
             return None
 
+    @auth.error_handler
+    def auth_error(status):
+        return {"message": "Unauthorized. Please sign in again."}, status
+
     def permission_required(required_role):
         def decorator(function):
             def decorator_function(*args, **kwargs):

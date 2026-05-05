@@ -75,6 +75,28 @@ function clearSession() {
   navigate("/dashboard", true);
 }
 
+function expireSession() {
+  state.token = null;
+  state.user = null;
+  state.groups = [];
+  state.assignments = [];
+  state.submissions = [];
+  state.adminStats = null;
+  state.adminUsers = [];
+  state.teacherStats = null;
+  state.teacherStudents = [];
+  localStorage.removeItem("classhub_token");
+  localStorage.removeItem("classhub_user");
+  $("#authPanel").classList.remove("hidden");
+  $("#appContent").classList.add("hidden");
+  $("#sessionName").textContent = "Guest";
+  $("#sessionRole").textContent = "Not signed in";
+  $("#avatar").textContent = "?";
+  updateRoleNavigation();
+  updateRoleSections();
+  navigate("/dashboard", true);
+}
+
 function updateShell() {
   const isLogged = Boolean(state.token);
   $("#authPanel").classList.toggle("hidden", isLogged);
@@ -114,6 +136,10 @@ async function api(path, options = {}) {
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
+    if (response.status === 401) {
+      expireSession();
+      throw new Error("Your session expired. Please sign in again.");
+    }
     const message = payload?.message || payload?.error || `Request failed (${response.status})`;
     const details = payload?.errors ? ` ${formatErrors(payload.errors)}` : "";
     throw new Error(`${message}${details}`);
