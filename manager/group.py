@@ -80,3 +80,23 @@ class GroupManager:
 
         db.session.delete(group)
         db.session.commit()
+
+    @staticmethod
+    def update_group(group_id, data, current_user):
+        group = Group.query.get(group_id)
+        if not group:
+            raise ValueError("Group not found")
+
+        if current_user.role != UserRoleEnum.ADMIN and group.owner_id != current_user.id:
+            raise PermissionError("Not allowed")
+
+        if "name" in data:
+            if not data["name"]:
+                raise ValueError("Group name is required")
+            group.name = data["name"]
+
+        if "is_private" in data:
+            group.is_private = data["is_private"]
+
+        db.session.commit()
+        return group

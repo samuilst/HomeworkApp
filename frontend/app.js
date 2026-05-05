@@ -12,6 +12,39 @@ const state = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
+function setText(selector, value) {
+  const element = $(selector);
+  if (element) element.textContent = value;
+}
+
+function setHtml(selector, value) {
+  const element = $(selector);
+  if (element) element.innerHTML = value;
+}
+
+function toggleHidden(selector, isHidden) {
+  const element = $(selector);
+  if (element) element.classList.toggle("hidden", isHidden);
+}
+
+function bindSubmit(selector, handler) {
+  const form = $(selector);
+  if (form) form.addEventListener("submit", handler);
+}
+
+function getFormField(form, name) {
+  return form?.elements?.[name] || null;
+}
+
+function setFormField(form, name, value) {
+  const field = getFormField(form, name);
+  if (field) field.value = value;
+}
+
+function isChecked(form, name) {
+  return Boolean(getFormField(form, name)?.checked);
+}
+
 const routes = {
   "/dashboard": { view: "dashboardView", title: "Dashboard" },
   "/files": { view: "filesView", title: "Files" },
@@ -43,6 +76,10 @@ function isTeacher() {
 
 function showToast(message, type = "success") {
   const toast = $("#toast");
+  if (!toast) {
+    console[type === "error" ? "error" : "log"](message);
+    return;
+  }
   toast.textContent = message;
   toast.className = `toast show ${type === "error" ? "error" : ""}`;
   window.clearTimeout(showToast.timer);
@@ -56,7 +93,7 @@ function setLoading(isLoading) {
   $$("button").forEach((button) => {
     if (button.id !== "logoutButton") button.disabled = isLoading;
   });
-  $("#lastStatus").textContent = isLoading ? "Syncing" : "Ready";
+  setText("#lastStatus", isLoading ? "Syncing" : "Ready");
 }
 
 function setSession(token, user) {
@@ -83,12 +120,13 @@ function clearSession() {
 
 function updateShell() {
   const isLogged = Boolean(state.token);
-  $("#authPanel").classList.toggle("hidden", isLogged);
-  $("#appContent").classList.toggle("hidden", !isLogged);
-  $("#sessionName").textContent = state.user?.email || state.user?.user_name || "Guest";
-  $("#sessionRole").textContent = state.user?.role || "Not signed in";
-  $("#avatar").textContent = (state.user?.email || state.user?.user_name || "?").slice(0, 1).toUpperCase();
-  $("#logoutButton").style.visibility = isLogged ? "visible" : "hidden";
+  toggleHidden("#authPanel", isLogged);
+  toggleHidden("#appContent", !isLogged);
+  setText("#sessionName", state.user?.email || state.user?.user_name || "Guest");
+  setText("#sessionRole", state.user?.role || "Not signed in");
+  setText("#avatar", (state.user?.email || state.user?.user_name || "?").slice(0, 1).toUpperCase());
+  const logoutButton = $("#logoutButton");
+  if (logoutButton) logoutButton.style.visibility = isLogged ? "visible" : "hidden";
 
   $$(".role-admin").forEach((element) => element.classList.toggle("hidden", !isAdmin()));
   $$(".role-teacher").forEach((element) => element.classList.toggle("hidden", !isTeacher()));
@@ -186,7 +224,7 @@ async function refreshData() {
 
     renderAll();
   } catch (error) {
-    $("#lastStatus").textContent = "Error";
+    setText("#lastStatus", "Error");
     showToast(error.message, "error");
   } finally {
     setLoading(false);
@@ -230,11 +268,11 @@ function navigate(path, replace = false) {
 function renderRoute(path = normalizePath(location.pathname)) {
   const route = routes[path];
   $$(".view").forEach((view) => view.classList.remove("active"));
-  $(`#${route.view}`).classList.add("active");
+  $(`#${route.view}`)?.classList.add("active");
   $$(".nav-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.route === path);
   });
-  $("#viewTitle").textContent = route.title;
+  setText("#viewTitle", route.title);
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -257,15 +295,15 @@ function updateShellRoleOnly() {
 }
 
 function renderMetrics() {
-  $("#groupCount").textContent = state.groups.length;
-  $("#assignmentCount").textContent = state.assignments.length;
-  $("#submissionCount").textContent = state.submissions.length;
-  $("#recentAssignments").innerHTML = assignmentCards(state.assignments.slice(0, 4));
-  $("#recentSubmissions").innerHTML = fileCards(state.submissions.slice(0, 4), false);
+  setText("#groupCount", state.groups.length);
+  setText("#assignmentCount", state.assignments.length);
+  setText("#submissionCount", state.submissions.length);
+  setHtml("#recentAssignments", assignmentCards(state.assignments.slice(0, 4)));
+  setHtml("#recentSubmissions", fileCards(state.submissions.slice(0, 4), false));
 }
 
 function renderGroups() {
-  $("#groupsList").innerHTML = state.groups.length
+  setHtml("#groupsList", state.groups.length
     ? state.groups.map((group) => `
       <article class="item-card">
         <strong>${escapeHtml(group.name)}</strong>
@@ -274,9 +312,26 @@ function renderGroups() {
           <span class="pill blue">ID ${escapeHtml(group.id)}</span>
           <span class="pill ${group.private ? "coral" : "green"}">${group.private ? "Private" : "Public"}</span>
         </div>
+        ${isTeacher() ? groupManageMenu(group.id, group.name, group.private, false) : ""}
       </article>
     `).join("")
-    : emptyState("No groups yet. Create one to start organizing homework.");
+    : emptyState("No groups yet. Create one to start organizing homework."));
+}
+
+function groupManageMenu(id, name, isPrivate, adminView = false) {
+  return `
+    <details class="action-menu">
+      <summary><i data-lucide="settings-2"></i><span>Manage</span></summary>
+      <form class="inline-edit-form" data-edit-group="${escapeHtml(id)}">
+        <label>Name<input name="name" value="${escapeHtml(name)}" maxlength="255" required /></label>
+        <label class="check-row"><input name="is_private" type="checkbox" ${isPrivate ? "checked" : ""} /> Private group</label>
+        <button class="secondary-button" type="submit"><i data-lucide="save"></i><span>Save group</span></button>
+      </form>
+      ${adminView ? `
+        <button class="danger-button" type="button" data-delete-group="${escapeHtml(id)}"><i data-lucide="trash-2"></i><span>Delete group</span></button>
+      ` : ""}
+    </details>
+  `;
 }
 
 function assignmentCards(assignments) {
@@ -291,11 +346,17 @@ function assignmentCards(assignments) {
           <span class="pill">ID ${escapeHtml(assignment.id)}</span>
         </div>
         ${isTeacher() ? `
-          <div class="card-actions">
-            <button class="ghost-button" type="button" data-fill-assignment="${escapeHtml(assignment.id)}"><i data-lucide="square-pen"></i><span>Edit</span></button>
+          <details class="action-menu">
+            <summary><i data-lucide="settings-2"></i><span>Manage</span></summary>
+            <form class="inline-edit-form" data-edit-assignment="${escapeHtml(assignment.id)}">
+              <label>Title<input name="title" value="${escapeHtml(assignment.title)}" maxlength="255" required /></label>
+              <label>Due date<input name="due_date" type="date" value="${assignment.due_date ? escapeHtml(assignment.due_date) : ""}" /></label>
+              <label>Description<textarea name="description" rows="3">${escapeHtml(assignment.description || "")}</textarea></label>
+              <button class="secondary-button" type="submit"><i data-lucide="save"></i><span>Save homework</span></button>
+            </form>
             <button class="ghost-button" type="button" data-missing-assignment="${escapeHtml(assignment.id)}"><i data-lucide="search"></i><span>Missing</span></button>
             <button class="danger-button" type="button" data-delete-assignment="${escapeHtml(assignment.id)}"><i data-lucide="trash-2"></i><span>Delete</span></button>
-          </div>
+          </details>
         ` : ""}
       </article>
     `).join("")
@@ -303,7 +364,7 @@ function assignmentCards(assignments) {
 }
 
 function renderAssignments() {
-  $("#assignmentsList").innerHTML = assignmentCards(state.assignments);
+  setHtml("#assignmentsList", assignmentCards(state.assignments));
 }
 
 function fileCards(submissions, grid = true, admin = false) {
@@ -321,10 +382,15 @@ function fileCards(submissions, grid = true, admin = false) {
         </div>
         ${submission.comment ? `<small class="meta">${escapeHtml(submission.comment)}</small>` : ""}
         ${(isTeacher() || admin) ? `
-          <div class="card-actions">
-            <button class="ghost-button" type="button" data-fill-grade="${escapeHtml(submission.assignment_id)}" data-student-id="${escapeHtml(submission.student_id)}"><i data-lucide="badge-check"></i><span>Grade</span></button>
+          <details class="action-menu">
+            <summary><i data-lucide="settings-2"></i><span>Manage</span></summary>
+            <form class="inline-edit-form" data-grade-submission="${escapeHtml(submission.assignment_id)}" data-student-id="${escapeHtml(submission.student_id)}">
+              <label>Grade<input name="grade" type="number" min="2" max="6" value="${submission.grade ? escapeHtml(submission.grade) : ""}" required /></label>
+              <label>Comment<textarea name="comment" rows="3">${escapeHtml(submission.comment || "")}</textarea></label>
+              <button class="secondary-button" type="submit"><i data-lucide="badge-check"></i><span>Save grade</span></button>
+            </form>
             <button class="danger-button" type="button" data-delete-submission="${escapeHtml(submission.assignment_id)}" data-student-id="${escapeHtml(submission.student_id)}"><i data-lucide="trash-2"></i><span>Delete</span></button>
-          </div>
+          </details>
         ` : ""}
       </article>
     `).join("")
@@ -332,34 +398,34 @@ function fileCards(submissions, grid = true, admin = false) {
 }
 
 function renderSubmissions() {
-  $("#submissionsList").innerHTML = fileCards(state.submissions);
+  setHtml("#submissionsList", fileCards(state.submissions));
 }
 
 function renderTeacherTools() {
   if (!isTeacher()) return;
   const dashboard = state.teacher.dashboard || {};
-  $("#teacherGroupCount").textContent = dashboard.groups ?? 0;
-  $("#teacherStudentCount").textContent = dashboard.students ?? 0;
-  $("#teacherAssignmentCount").textContent = dashboard.assignments ?? 0;
-  $("#teacherUngradedCount").textContent = dashboard.ungraded_submissions ?? 0;
-  $("#teacherStudentsList").innerHTML = state.teacher.students.length
+  setText("#teacherGroupCount", dashboard.groups ?? 0);
+  setText("#teacherStudentCount", dashboard.students ?? 0);
+  setText("#teacherAssignmentCount", dashboard.assignments ?? 0);
+  setText("#teacherUngradedCount", dashboard.ungraded_submissions ?? 0);
+  setHtml("#teacherStudentsList", state.teacher.students.length
     ? state.teacher.students.map(userCard).join("")
-    : emptyState("No students in your groups yet.");
+    : emptyState("No students in your groups yet."));
 }
 
 function renderAdminTools() {
   if (!isAdmin()) return;
   const stats = state.admin.stats || {};
-  $("#adminUsersCount").textContent = stats.users ?? 0;
-  $("#adminTeachersCount").textContent = stats.teachers ?? 0;
-  $("#adminStudentsCount").textContent = stats.students ?? 0;
-  $("#adminUngradedCount").textContent = stats.ungraded_submissions ?? 0;
+  setText("#adminUsersCount", stats.users ?? 0);
+  setText("#adminTeachersCount", stats.teachers ?? 0);
+  setText("#adminStudentsCount", stats.students ?? 0);
+  setText("#adminUngradedCount", stats.ungraded_submissions ?? 0);
 
-  $("#adminUsersList").innerHTML = state.admin.users.length
+  setHtml("#adminUsersList", state.admin.users.length
     ? state.admin.users.map((user) => userCard(user, true)).join("")
-    : emptyState("No users found.");
+    : emptyState("No users found."));
 
-  $("#adminGroupsList").innerHTML = state.admin.groups.length
+  setHtml("#adminGroupsList", state.admin.groups.length
     ? state.admin.groups.map((group) => `
       <article class="item-card">
         <strong>${escapeHtml(group.name)}</strong>
@@ -368,18 +434,16 @@ function renderAdminTools() {
           <span class="pill blue">ID ${escapeHtml(group.id)}</span>
           <span class="pill ${group.is_private ? "coral" : "green"}">${group.is_private ? "Private" : "Public"}</span>
         </div>
-        <div class="card-actions">
-          <button class="danger-button" type="button" data-delete-group="${escapeHtml(group.id)}"><i data-lucide="trash-2"></i><span>Delete group</span></button>
-        </div>
+        ${groupManageMenu(group.id, group.name, group.is_private, true)}
       </article>
     `).join("")
-    : emptyState("No groups found.");
+    : emptyState("No groups found."));
 
-  $("#adminAssignmentsList").innerHTML = state.admin.assignments.length
+  setHtml("#adminAssignmentsList", state.admin.assignments.length
     ? assignmentCards(state.admin.assignments)
-    : emptyState("No homework found.");
+    : emptyState("No homework found."));
 
-  $("#adminSubmissionsList").innerHTML = fileCards(state.admin.submissions, true, true);
+  setHtml("#adminSubmissionsList", fileCards(state.admin.submissions, true, true));
 }
 
 function userCard(user, adminActions = false) {
@@ -392,13 +456,23 @@ function userCard(user, adminActions = false) {
         <span class="pill ${user.role === "ADMIN" ? "coral" : user.role === "TEACHER" ? "gold" : "green"}">${escapeHtml(user.role)}</span>
       </div>
       ${adminActions ? `
-        <div class="card-actions">
-          <button class="ghost-button" type="button" data-fill-user="${escapeHtml(user.id)}"><i data-lucide="square-pen"></i><span>Edit</span></button>
-          <button class="ghost-button" type="button" data-set-role="${escapeHtml(user.id)}" data-role="STUDENT"><i data-lucide="graduation-cap"></i><span>Student</span></button>
-          <button class="ghost-button" type="button" data-set-role="${escapeHtml(user.id)}" data-role="TEACHER"><i data-lucide="presentation"></i><span>Teacher</span></button>
-          <button class="ghost-button" type="button" data-set-role="${escapeHtml(user.id)}" data-role="ADMIN"><i data-lucide="shield"></i><span>Admin</span></button>
+        <details class="action-menu">
+          <summary><i data-lucide="settings-2"></i><span>Manage</span></summary>
+          <form class="inline-edit-form" data-edit-user="${escapeHtml(user.id)}">
+            <label>Username<input name="user_name" value="${escapeHtml(user.user_name)}" maxlength="50" required /></label>
+            <label>Email<input name="email" type="email" value="${escapeHtml(user.email)}" required /></label>
+            <label>New password<input name="password" type="password" autocomplete="new-password" /></label>
+            <label>Role
+              <select name="role" required>
+                <option value="STUDENT" ${user.role === "STUDENT" ? "selected" : ""}>Student</option>
+                <option value="TEACHER" ${user.role === "TEACHER" ? "selected" : ""}>Teacher</option>
+                <option value="ADMIN" ${user.role === "ADMIN" ? "selected" : ""}>Admin</option>
+              </select>
+            </label>
+            <button class="secondary-button" type="submit"><i data-lucide="save"></i><span>Save user</span></button>
+          </form>
           <button class="danger-button" type="button" data-delete-user="${escapeHtml(user.id)}"><i data-lucide="trash-2"></i><span>Delete</span></button>
-        </div>
+        </details>
       ` : ""}
     </article>
   `;
@@ -446,14 +520,14 @@ function bindNavigation() {
     tab.addEventListener("click", () => {
       $$(".tab").forEach((item) => item.classList.remove("active"));
       tab.classList.add("active");
-      $("#loginForm").classList.toggle("hidden", tab.dataset.authTab !== "login");
-      $("#registerForm").classList.toggle("hidden", tab.dataset.authTab !== "register");
+      toggleHidden("#loginForm", tab.dataset.authTab !== "login");
+      toggleHidden("#registerForm", tab.dataset.authTab !== "register");
     });
   });
 }
 
 function bindForms() {
-  $("#loginForm").addEventListener("submit", async (event) => {
+  bindSubmit("#loginForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
@@ -465,7 +539,7 @@ function bindForms() {
     }
   });
 
-  $("#registerForm").addEventListener("submit", async (event) => {
+  bindSubmit("#registerForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
@@ -478,11 +552,11 @@ function bindForms() {
     }
   });
 
-  $("#groupForm").addEventListener("submit", async (event) => {
+  bindSubmit("#groupForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
-      data.is_private = event.currentTarget.elements.is_private.checked;
+      data.is_private = isChecked(event.currentTarget, "is_private");
       await api("/groups", { method: "POST", body: JSON.stringify(data) });
       event.currentTarget.reset();
       await refreshData();
@@ -492,7 +566,7 @@ function bindForms() {
     }
   });
 
-  $("#addUserForm").addEventListener("submit", async (event) => {
+  bindSubmit("#addUserForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
@@ -508,7 +582,7 @@ function bindForms() {
     }
   });
 
-  $("#removeUserForm").addEventListener("submit", async (event) => {
+  bindSubmit("#removeUserForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
@@ -521,7 +595,7 @@ function bindForms() {
     }
   });
 
-  $("#assignmentForm").addEventListener("submit", async (event) => {
+  bindSubmit("#assignmentForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
@@ -536,22 +610,7 @@ function bindForms() {
     }
   });
 
-  $("#assignmentUpdateForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
-      const data = compactPayload(readForm(event.currentTarget));
-      const assignmentId = data.assignment_id;
-      delete data.assignment_id;
-      await api(`/assignments/${assignmentId}`, { method: "PUT", body: JSON.stringify(data) });
-      event.currentTarget.reset();
-      await refreshData();
-      showToast("Homework updated");
-    } catch (error) {
-      showToast(error.message, "error");
-    }
-  });
-
-  $("#uploadForm").addEventListener("submit", async (event) => {
+  bindSubmit("#uploadForm", async (event) => {
     event.preventDefault();
     try {
       const data = new FormData(event.currentTarget);
@@ -564,7 +623,7 @@ function bindForms() {
     }
   });
 
-  $("#gradeForm").addEventListener("submit", async (event) => {
+  bindSubmit("#gradeForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
@@ -580,7 +639,7 @@ function bindForms() {
     }
   });
 
-  $("#reportForm").addEventListener("submit", async (event) => {
+  bindSubmit("#reportForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
@@ -590,18 +649,18 @@ function bindForms() {
     }
   });
 
-  $("#countForm").addEventListener("submit", async (event) => {
+  bindSubmit("#countForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
       const payload = await api(`/students/${encodeURIComponent(data.student_id)}/submission-count`);
-      $("#countResult").textContent = `${payload.user_name}: ${payload.submission_count} uploaded file(s)`;
+      setText("#countResult", `${payload.user_name}: ${payload.submission_count} uploaded file(s)`);
     } catch (error) {
       showToast(error.message, "error");
     }
   });
 
-  $("#teacherStudentForm").addEventListener("submit", async (event) => {
+  bindSubmit("#teacherStudentForm", async (event) => {
     event.preventDefault();
     try {
       const data = compactPayload(readForm(event.currentTarget));
@@ -615,7 +674,7 @@ function bindForms() {
     }
   });
 
-  $("#adminCreateUserForm").addEventListener("submit", async (event) => {
+  bindSubmit("#adminCreateUserForm", async (event) => {
     event.preventDefault();
     try {
       const data = readForm(event.currentTarget);
@@ -628,30 +687,80 @@ function bindForms() {
     }
   });
 
-  $("#adminUpdateUserForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
-      const data = compactPayload(readForm(event.currentTarget));
-      const userId = data.user_id;
-      delete data.user_id;
-      await api(`/admin/users/${encodeURIComponent(userId)}`, { method: "PUT", body: JSON.stringify(data) });
-      event.currentTarget.reset();
-      await refreshData();
-      showToast("User updated");
-    } catch (error) {
-      showToast(error.message, "error");
-    }
-  });
-
-  $("#refreshButton").addEventListener("click", refreshData);
-  $("#logoutButton").addEventListener("click", clearSession);
+  $("#refreshButton")?.addEventListener("click", refreshData);
+  $("#logoutButton")?.addEventListener("click", clearSession);
 
   document.addEventListener("click", handleActionClick);
+  document.addEventListener("submit", handleInlineSubmit);
+}
+
+async function handleInlineSubmit(event) {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement)) return;
+
+  const userId = form.dataset.editUser;
+  const groupId = form.dataset.editGroup;
+  const assignmentId = form.dataset.editAssignment;
+  const gradeAssignmentId = form.dataset.gradeSubmission;
+
+  if (!userId && !groupId && !assignmentId && !gradeAssignmentId) return;
+
+  event.preventDefault();
+
+  try {
+    if (userId) {
+      const data = compactPayload(readForm(form));
+      await api(`/admin/users/${encodeURIComponent(userId)}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+      await refreshData();
+      showToast("User saved");
+      return;
+    }
+
+    if (groupId) {
+      const data = readForm(form);
+      await api(`/groups/${groupId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: data.name,
+          is_private: isChecked(form, "is_private"),
+        }),
+      });
+      await refreshData();
+      showToast("Group saved");
+      return;
+    }
+
+    if (assignmentId) {
+      const data = compactPayload(readForm(form));
+      await api(`/assignments/${assignmentId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+      await refreshData();
+      showToast("Homework saved");
+      return;
+    }
+
+    if (gradeAssignmentId) {
+      const data = readForm(form);
+      await api(`/submissions/${gradeAssignmentId}/${encodeURIComponent(form.dataset.studentId)}`, {
+        method: "PUT",
+        body: JSON.stringify({ grade: Number(data.grade), comment: data.comment || null }),
+      });
+      await refreshData();
+      showToast("Grade saved");
+    }
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 
 async function renderMissingReport(assignmentId) {
   const payload = await api(`/assignments/${assignmentId}/missing-submissions`);
-  $("#missingList").innerHTML = payload.missing_students?.length
+  setHtml("#missingList", payload.missing_students?.length
     ? payload.missing_students.map((student) => `
       <article class="item-card">
         <strong>${escapeHtml(student.user_name)}</strong>
@@ -659,12 +768,12 @@ async function renderMissingReport(assignmentId) {
         <span class="pill coral">ID ${escapeHtml(student.id)}</span>
       </article>
     `).join("")
-    : emptyState("Everyone submitted this homework.");
+    : emptyState("Everyone submitted this homework."));
   showToast(`Missing submissions: ${payload.missing_count}`);
 }
 
 async function handleActionClick(event) {
-  const button = event.target.closest("button");
+  const button = event.target?.closest?.("button");
   if (!button || state.loading) return;
 
   try {
@@ -672,18 +781,6 @@ async function handleActionClick(event) {
       state.admin.roleFilter = button.dataset.roleFilter;
       await refreshData();
       showToast(state.admin.roleFilter ? `Filtered ${state.admin.roleFilter.toLowerCase()} users` : "Showing all users");
-    }
-
-    if (button.dataset.fillUser) {
-      const user = state.admin.users.find((item) => item.id === button.dataset.fillUser);
-      if (user) {
-        const form = $("#adminUpdateUserForm");
-        form.elements.user_id.value = user.id;
-        form.elements.user_name.value = user.user_name;
-        form.elements.email.value = user.email;
-        form.elements.role.value = user.role;
-        form.elements.password.value = "";
-      }
     }
 
     if (button.dataset.setRole) {
@@ -707,21 +804,9 @@ async function handleActionClick(event) {
       showToast("Group deleted");
     }
 
-    if (button.dataset.fillAssignment) {
-      const assignment = [...state.assignments, ...state.admin.assignments].find((item) => String(item.id) === String(button.dataset.fillAssignment));
-      if (assignment) {
-        const form = $("#assignmentUpdateForm");
-        form.elements.assignment_id.value = assignment.id;
-        form.elements.title.value = assignment.title || "";
-        form.elements.due_date.value = assignment.due_date || "";
-        form.elements.description.value = assignment.description || "";
-        navigate("/homework");
-      }
-    }
-
     if (button.dataset.missingAssignment) {
       const form = $("#reportForm");
-      form.elements.assignment_id.value = button.dataset.missingAssignment;
+      setFormField(form, "assignment_id", button.dataset.missingAssignment);
       navigate("/homework");
       await renderMissingReport(button.dataset.missingAssignment);
     }
@@ -734,8 +819,10 @@ async function handleActionClick(event) {
 
     if (button.dataset.fillGrade) {
       const form = $("#gradeForm");
-      form.elements.assignment_id.value = button.dataset.fillGrade;
-      form.elements.student_id.value = button.dataset.studentId || "";
+      if (form) {
+        setFormField(form, "assignment_id", button.dataset.fillGrade);
+        setFormField(form, "student_id", button.dataset.studentId || "");
+      }
       navigate("/homework");
     }
 
