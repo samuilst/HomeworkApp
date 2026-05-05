@@ -421,9 +421,9 @@ function fileCards(submissions, grid = true, admin = false) {
         </div>
         ${submission.download_url ? `
           <div class="card-actions">
-            <a class="ghost-button" href="${escapeHtml(submission.download_url)}" target="_blank" rel="noopener noreferrer">
+            <button class="ghost-button" type="button" data-open-file="${escapeHtml(submission.download_url)}">
               <i data-lucide="external-link"></i><span>Open file</span>
-            </a>
+            </button>
           </div>
         ` : ""}
         ${submission.comment ? `<small class="meta">${escapeHtml(submission.comment)}</small>` : ""}
@@ -846,6 +846,10 @@ async function handleActionClick(event) {
   if (!button || state.loading) return;
 
   try {
+    if (button.dataset.openFile) {
+      await openSubmissionFile(button.dataset.openFile);
+    }
+
     if (button.dataset.roleFilter !== undefined) {
       state.admin.roleFilter = button.dataset.roleFilter;
       await refreshData();
@@ -909,6 +913,29 @@ async function handleActionClick(event) {
   } catch (error) {
     showToast(error.message, "error");
   }
+}
+
+async function openSubmissionFile(path) {
+  const fileWindow = window.open("", "_blank", "noopener,noreferrer");
+  const headers = new Headers();
+  if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
+
+  const response = await fetch(path, { headers });
+  if (!response.ok) {
+    if (fileWindow) fileWindow.close();
+    const contentType = response.headers.get("content-type") || "";
+    const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+    throw new Error(readableErrorText(payload, response));
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  if (fileWindow) {
+    fileWindow.location.href = url;
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

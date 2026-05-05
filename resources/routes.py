@@ -15,6 +15,7 @@ from resources.submission import SubmissionDeleteResource
 from resources.submission import SubmissionGradeResource
 from resources.submission import MissingSubmissionsResource
 from resources.submission import StudentSubmissionCountResource
+from resources.submission import SubmissionFileResource
 from resources.admin import AdminAssignmentsResource
 from resources.admin import AdminGroupsResource
 from resources.admin import AdminStatsResource
@@ -42,6 +43,7 @@ routes = (
 
     (SubmissionCreateResource, "/submissions"),
     (SubmissionDeleteResource, "/submissions"),
+    (SubmissionFileResource, "/submissions/<int:submission_id>/file"),
     (SubmissionGradeResource, "/submissions/<int:assignment_id>/<string:student_id>"),
     (MissingSubmissionsResource, "/assignments/<int:assignment_id>/missing-submissions"),
     (StudentSubmissionCountResource, "/students/<string:student_id>/submission-count"),

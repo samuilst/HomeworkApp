@@ -3,7 +3,6 @@ from flask_restful import Resource
 
 from manager.admin import AdminManager, serialize_user
 from manager.auth import auth
-from manager.s3_storage import S3Storage
 from schemas.admin import AdminUserCreateSchema, AdminUserUpdateSchema
 
 create_user_schema = AdminUserCreateSchema()
@@ -40,7 +39,7 @@ def serialize_submission(submission):
         "student_id": submission.student_id,
         "student_name": submission.student.user_name if submission.student else None,
         "file_path": submission.file_path,
-        "download_url": S3Storage.presigned_url(submission.file_path),
+        "download_url": f"/submissions/{submission.submission_id}/file",
         "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
         "grade": submission.grade,
         "comment": submission.comment,

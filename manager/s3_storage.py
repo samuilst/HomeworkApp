@@ -110,3 +110,16 @@ class S3Storage:
             )
         except Exception as exc:
             raise RuntimeError(S3Storage._storage_error_message(exc)) from exc
+
+    @staticmethod
+    def get_object(file_path):
+        bucket, key = S3Storage.split_s3_path(file_path)
+        if not bucket or not key:
+            raise ValueError("Invalid S3 file path")
+
+        try:
+            response = S3Storage._client().get_object(Bucket=bucket, Key=key)
+        except Exception as exc:
+            raise RuntimeError(S3Storage._storage_error_message(exc)) from exc
+
+        return response, key
